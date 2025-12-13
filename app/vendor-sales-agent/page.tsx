@@ -1,8 +1,13 @@
-"use client";
-
 // app/vendor-sales-agent/page.tsx
 
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Vendor Sales Agent | 5 Star Weddings",
+  description:
+    "Share a little about your brand and let our AI concierge show you how 5 Star Weddings can bring you more high value destination enquiries.",
+};
 
 export default function VendorSalesAgentPage() {
   return (
@@ -11,16 +16,10 @@ export default function VendorSalesAgentPage() {
         minHeight: "100vh",
         backgroundColor: "#f7f7f7",
         padding: "40px 16px 60px",
-        fontFamily:
-          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        fontFamily: "system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}
     >
-      <div
-        style={{
-          maxWidth: 1040,
-          margin: "0 auto",
-        }}
-      >
+      <div style={{ maxWidth: 1040, margin: "0 auto" }}>
         <section style={{ marginBottom: 32, textAlign: "center" }}>
           <p
             style={{
@@ -33,6 +32,7 @@ export default function VendorSalesAgentPage() {
           >
             5 Star Weddings
           </p>
+
           <h1
             style={{
               fontFamily: "Gilda Display, serif",
@@ -43,6 +43,7 @@ export default function VendorSalesAgentPage() {
           >
             Vendor Sales Agent
           </h1>
+
           <p
             style={{
               maxWidth: 640,
@@ -85,6 +86,7 @@ export default function VendorSalesAgentPage() {
             >
               Is 5 Star Weddings the right home for your brand?
             </h2>
+
             <p
               style={{
                 fontSize: 14,
@@ -109,7 +111,7 @@ export default function VendorSalesAgentPage() {
               }}
             >
               <li style={{ marginBottom: 8 }}>
-                • Discover how many high-value couples we reach in your markets
+                • Discover how many high value couples we reach in your markets
               </li>
               <li style={{ marginBottom: 8 }}>
                 • Explore options for featured placement and editorial coverage
@@ -159,17 +161,11 @@ export default function VendorSalesAgentPage() {
                   backgroundColor: "#ffffff",
                 }}
               >
-                Book a short call
+                Request details
               </Link>
             </div>
 
-            <p
-              style={{
-                marginTop: 16,
-                fontSize: 12,
-                color: "#777",
-              }}
-            >
+            <p style={{ marginTop: 16, fontSize: 12, color: "#777" }}>
               Prefer to type instead of talk? Use the concierge on the right,
               then we can follow up personally with a tailored proposal.
             </p>
@@ -204,6 +200,7 @@ export default function VendorSalesAgentPage() {
               >
                 AI Concierge
               </p>
+
               <p
                 style={{
                   fontFamily: "Gilda Display, serif",

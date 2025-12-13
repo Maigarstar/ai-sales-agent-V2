@@ -1,0 +1,8 @@
+
+	.button {
+		font-bold outline-none whitespace-nowrap content-center;
+	
+	
+	.button-press-feedback {
+		transition-transform active:scale-[0.98];
+		

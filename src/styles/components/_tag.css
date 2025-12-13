@@ -1,0 +1,16 @@
+
+  .tag {
+    rounded-lg py-1 px-2.5 border items-center inline-flex text-xs font-semibold whitespace-nowrap;
+  
+  
+  .tag-affix {
+    h-2 w-2 rounded-full bg-gray-400;
+  
+  
+  .tag-prefix {
+    mr-1.5 rtl:ml-1.5;
+  
+  
+  .tag-suffix {
+    ml-1.5 rtl:mr-1.5;
+    

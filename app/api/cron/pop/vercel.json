@@ -1,0 +1,11 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/pop",
+      "schedule": "*/5 * * * *",
+      "headers": {
+        "Authorization": "Bearer f25735cc5cf69f4b087d7e9bccbd9698346c3f8ba84006a29dd437b5ff479050"
+      }
+    }
+  ]
+}

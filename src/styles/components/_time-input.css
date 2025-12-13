@@ -1,0 +1,12 @@
+
+  .time-input-field {
+    ring-0 w-6 text-center outline-none bg-transparent;
+  
+
+  .time-input-wrapper {
+    flex items-center h-full rtl:flex-row-reverse rtl:justify-end;
+  
+
+  .time-input-separator {
+    mx-2;
+  

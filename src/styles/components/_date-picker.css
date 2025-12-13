@@ -1,0 +1,158 @@
+
+  .date-picker {
+    z-40 max-w-xs shadow-xl dark:shadow-2xl bg-white dark:bg-gray-800 rounded-xl p-4;
+  
+
+  .date-picker-panel {
+    rounded-lg;
+  
+
+  .date-picker-header-label {
+    cursor-pointer mx-0.5 select-none text-gray-900 dark:text-gray-100;
+  
+  .date-picker-current-month {
+    text-gray-700 dark:text-gray-100;
+  
+
+  .date-picker-other-month {
+    text-gray-400 dark:text-gray-600;
+  
+
+  .date-picker-selected-date {
+    text-white;
+  
+
+  .date-picker-available {
+    hover:text-white;
+  
+
+  .date-picker-today {
+    border;
+  
+
+  .date-picker-month-cell {
+    text-center py-6 font-semibold;
+  
+
+  .date-picker-month-cell-disabled {
+    opacity-30 bg-gray-300 cursor-not-allowed;
+  
+
+  .date-picker-month-cell-inner {
+    cursor-pointer px-4 py-2 rounded-lg select-none;
+  
+
+  .date-picker-year-cell {
+    text-center py-6;
+  
+
+  .date-picker-year-cell-inner {
+    cursor-pointer px-4 py-2 rounded-lg select-none font-semibold;
+  
+
+  .date-picker-year-cell-disabled {
+    opacity-30 bg-gray-300 cursor-not-allowed;
+  
+
+  .picker {
+    z-40;
+  
+
+  .picker-panel {
+    shadow-xl dark:shadow-2xl bg-white dark:bg-gray-900 rounded-2xl p-4 dark:border-2 dark:border-gray-700;
+  
+
+  .picker-view {
+    min-w-[280px] w-full flex gap-6;
+  
+
+  .picker-table {
+    border-separate border-spacing-y-1.5 w-full;
+  
+
+  .picker-header-arrow {
+    cursor-pointer flex items-center px-2 text-lg rtl:rotate-180 select-none h-10;
+  
+
+  .picker-direction-button {
+    text-2xl rounded-full h-10 w-10 flex items-center justify-center hover:text-gray-800 hover:dark:text-gray-100 hover:bg-gray-100 hover:dark:bg-gray-700;
+  
+
+  .picker-header-label {
+    cursor-pointer mx-0.5 select-none text-gray-900 dark:text-gray-100 text-lg font-semibold;
+  
+
+  .year-table,
+  .month-table {
+    grid grid-cols-3 gap-4;
+  
+
+  .date-picker-cell {
+    text-center w-10 h-10 p-0;
+  
+
+  .date-picker-cell-selected {
+    text-gray-100;
+  
+
+  .date-picker-cell-selected-start {
+    relative rounded-full before:content-[''] before:absolute before:bg-primary-subtle before:w-full before:h-full before:left-0 before:top-0 ltr:before:rounded-tl-full ltr:before:rounded-bl-full rtl:before:rounded-tr-full rtl:before:rounded-br-full;
+  
+
+  .date-picker-cell-selected-end {
+    relative rounded-full before:content-[''] before:absolute before:bg-primary-subtle before:w-full before:h-full before:left-0 before:top-0 ltr:before:rounded-tr-full ltr:before:rounded-br-full rtl:before:rounded-tl-full rtl:before:rounded-bl-full;
+  
+
+  .date-picker-cell-inrange-today {
+    relative rounded-full before:content-[''] before:absolute before:bg-primary-subtle before:w-full before:h-full before:left-0 before:top-0;
+  
+
+  .date-picker-cell-content {
+    h-full w-full;
+  
+
+  .date-picker-cell-current-month {
+    text-gray-700 dark:text-gray-400;
+  
+
+  .date-picker-cell-hoverable {
+    hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-gray-300;
+  
+
+  .date-picker-cell-disabled {
+    opacity-30 bg-gray-300 cursor-not-allowed;
+  
+
+  .date-picker-week-cell {
+    font-semibold;
+  
+
+  .week-day-cell {
+    h-7;
+  
+
+  .week-day-cell-content {
+    text-xs;
+  
+
+  .day-picker,
+  .month-picker,
+  .year-picker {
+    w-full;
+  
+
+  .month-picker-cell,
+  .year-picker-cell {
+    text-center py-2 rounded-lg font-semibold text-gray-800;
+  
+
+  .month-picker-cell-active,
+  .year-picker-cell-active {
+    text-white;
+  
+
+  .month-picker-cell-disabled,
+  .year-picker-cell-disabled {
+    opacity-30 bg-gray-300 cursor-not-allowed;
+  
+

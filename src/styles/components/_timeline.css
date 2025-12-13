@@ -1,0 +1,40 @@
+
+  .timeline {
+    flex-col items-start;
+  
+
+  .timeline-item {
+    flex min-h-[70px];
+  
+
+  .timeline-item-last {
+    min-h-max;
+  
+
+  .timeline-item-media {
+    flex flex-col items-center;
+  
+
+  .timeline-item-media-content {
+    my-1;
+  
+
+  .timeline-item-media-default {
+    rounded-full bg-gray-200 dark:bg-gray-600 h-4 w-4;
+  
+
+  .timeline-item-wrapper {
+    flex flex-auto;
+  
+
+  .timeline-item-content {
+    ml-4 rtl:mr-4 pb-6 pt-0.5 w-full;
+  
+
+  .timeline-item-content-last {
+    pb-0;
+  
+
+  .timeline-connect {
+    h-full w-[2px] bg-gray-200 dark:bg-gray-600 flex-grow;
+  

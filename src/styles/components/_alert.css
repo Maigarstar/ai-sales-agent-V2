@@ -1,0 +1,21 @@
+@layer components {
+  .alert {
+    @apply p-4 rounded-lg border text-sm flex items-center gap-3;
+  }
+
+  .alert-success {
+    @apply bg-success-subtle border-success text-success;
+  }
+
+  .alert-error {
+    @apply bg-error-subtle border-error text-error;
+  }
+
+  .alert-warning {
+    @apply bg-warning-subtle border-warning text-warning;
+  }
+
+  .alert-info {
+    @apply bg-primary-subtle border-primary text-primary;
+  }
+}

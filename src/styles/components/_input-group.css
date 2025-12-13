@@ -1,0 +1,76 @@
+
+  .input-group {
+    flex items-center;
+  
+    .input {
+      &:focus,
+      &:focus-within {
+        z-10;
+      
+    
+  
+    .date-picker {
+      z-index: 11;
+    
+  
+    .select-control-focused,
+    .date-picker.picker-expanded,
+    .input-suffix-end,
+    .input-suffix-start {
+      z-20;
+    
+  
+    > .input,
+    > .input-addon,
+    > .button {
+      &:first-child {
+        ltr:rounded-r-none! rtl:rounded-l-none!;
+      
+  
+      &:last-child:not(.picker) {
+        ltr:rounded-l-none! rtl:rounded-r-none!;
+      
+  
+      &:not(:first-child) {
+        ltr:rounded-l-none! ltr:-ml-px rtl:rounded-r-none! rtl:-mr-px;
+      
+  
+      &:not(:last-child) {
+        ltr:rounded-r-none! rtl:rounded-l-none!;
+      
+    
+  
+    > * {
+      &:first-child {
+        .input,
+        .select__control {
+          ltr:rounded-r-none rtl:rounded-l-none;
+        
+      
+  
+      &:last-child {
+        .input,
+        .select__control {
+          ltr:rounded-l-none rtl:rounded-r-none;
+        
+      
+  
+      &:not(:first-child) {
+        .input,
+        .select__control {
+          ltr:rounded-l-none ltr:-ml-px rtl:rounded-r-none rtl:-mr-px;
+        
+      
+  
+      &:not(:last-child) {
+        .input,
+        .select__control {
+          ltr:rounded-r-none rtl:rounded-l-none;
+        
+      
+    
+  
+    >.button {
+      z-10 hover:z-20;
+    
+    

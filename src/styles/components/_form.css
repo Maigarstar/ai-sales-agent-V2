@@ -1,0 +1,34 @@
+
+  .form-item {
+    mb-7 relative;
+  
+    &.horizontal {
+      flex flex-auto;
+    
+  
+    &.vertical {
+      flex flex-col;
+    
+  
+    &.inline {
+      md:inline-flex! mr-3 rtl:ml-3;
+    
+  
+  
+  .form-label {
+    flex items-center font-semibold;
+  
+    &.invalid {
+      text-error;
+    
+  
+  
+  .form-explain {
+    text-error absolute font-semibold;
+  
+  
+  .form-container {
+    &.inline {
+      md:flex! items-center;
+    
+    

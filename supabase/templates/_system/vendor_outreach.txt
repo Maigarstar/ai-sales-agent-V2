@@ -1,0 +1,30 @@
+# System templates
+cat << 'EOF' > supabase/templates/_system/vendor_outreach.txt
+Hi [Name],
+
+Your work has been appearing more frequently in our searches...
+EOF
+
+cat << 'EOF' > supabase/templates/_system/couple_reply.txt
+Hi [Name], here is a personalised reply to assist a couple planning a luxury wedding...
+EOF
+
+cat << 'EOF' > supabase/templates/_system/subject_generator.txt
+Generate 5 luxury subject lines that feel elegant and curated.
+EOF
+
+# User editable templates
+cat << 'EOF' > supabase/templates/user/venue_template.txt
+Dear [Venue Name],
+This is your editable outreach template for venues.
+EOF
+
+cat << 'EOF' > supabase/templates/user/vendor_template.txt
+Hi [Vendor Name],
+This is your editable outreach template for vendors.
+EOF
+
+cat << 'EOF' > supabase/templates/user/couple_template.txt
+Hi [Name],
+This is your editable outreach message for couples.
+EOF

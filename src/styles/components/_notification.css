@@ -1,0 +1,20 @@
+
+  .notification {
+    bg-white shadow-xl dark:shadow-2xl rounded-xl mb-3 relative border border-gray-100 dark:bg-gray-700 dark:border-transparent font-semibold;
+  
+
+  .notification-content {
+    py-5 px-6 flex;
+
+    &.no-child {
+      items-center;
+    
+  
+
+  .notification-title {
+    font-bold text-base text-gray-800 dark:text-white;
+  
+
+  .notification-close {
+    top-5 ltr:right-4 rtl:left-4;
+  

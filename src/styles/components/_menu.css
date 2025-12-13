@@ -1,0 +1,28 @@
+
+  .menu-title {
+    uppercase font-semibold px-3 mt-4 mb-2;
+  
+    &.menu-title-light {
+      text-gray-500;
+    
+  
+    &.menu-title-dark {
+      text-gray-300;
+    
+  
+    &.menu-title-themed {
+      text-gray-100/50;
+    
+  
+  
+  .menu-light {
+    bg-white;
+  
+  
+  .menu-dark {
+    bg-gray-800;
+  
+  
+  .menu-transparent {
+    bg-transparent;
+    

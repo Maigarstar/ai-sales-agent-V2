@@ -1,0 +1,82 @@
+
+  .avatar {
+    inline-block relative bg-gray-400 dark:bg-gray-600 text-gray-100;
+  
+
+  .avatar-sm {
+    w-8 h-8 leading-8;
+  
+
+  .avatar-md {
+    w-10 h-10 leading-10;
+  
+
+  .avatar-lg {
+    w-12 h-12 leading-10;
+  
+
+  .avatar-round {
+    rounded-lg;
+  
+
+  .avatar-square {
+    rounded-none;
+  
+
+  .avatar-circle {
+    rounded-full;
+  
+
+  .avatar-img {
+    block w-full h-full object-cover;
+  
+
+  .avatar-string {
+    absolute origin-center left-2/4 flex items-center font-semibold;
+  
+
+  .avatar-inner-sm {
+    h-8;
+  
+
+  .avatar-inner-md {
+    h-10;
+  
+
+  .avatar-inner-lg {
+    h-12;
+  
+
+  .avatar-icon {
+    flex items-center justify-center h-full;
+  
+
+  .avatar-icon-sm {
+    text-lg;
+  
+
+  .avatar-icon-md {
+    text-xl;
+  
+
+  .avatar-icon-lg {
+    text-2xl;
+  
+
+  .avatar-group {
+    inline-flex;
+  
+
+  .avatar-group-chained {
+    > .avatar,
+    > .tooltip-wrapper {
+      -ml-2 rtl:-mr-2;
+    
+
+    > .avatar,
+    > .tooltip-wrapper {
+      &:first-child {
+        ml-0 rtl:mr-0;
+      
+    
+  

@@ -1,0 +1,28 @@
+
+  .pagination {
+    relative z-0 inline-flex items-center rounded-lg;
+  
+
+  .pagination-pager {
+    cursor-pointer relative mx-1 rounded-lg inline-flex items-center h-8 w-8 justify-center text-sm font-semibold select-none;
+  
+
+  .pagination-pager-inactive {
+    text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-600;
+  
+
+  .pagination-pager-disabled {
+    cursor-not-allowed text-gray-300 dark:text-gray-600;
+  
+
+  .pagination-total {
+    font-semibold mr-3 text-gray-500 dark:text-gray-400;
+  
+
+  .pagination-pager-next {
+    mr-1 rtl:rotate-180;
+  
+
+  .pagination-pager-prev {
+    ml-1 rtl:rotate-180;
+  

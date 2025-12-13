@@ -1,14 +1,12 @@
-import { NextResponse } from "next/server";
+// app/api/admin/ai-rewrite/route.ts
+// The 'route' file MUST export a handler function.
 
-export const runtime = "nodejs";
+import { NextResponse } from 'next/server';
 
-export async function GET() {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: "POP inbox disabled",
-      hint: "Enable IMAP or add a server only mail fetcher later",
-    },
-    { status: 501 }
-  );
+export async function POST(request: Request) {
+  // ... your logic here
+  return NextResponse.json({ success: true });
 }
+
+// Or if it's a GET request:
+// export async function GET(request: Request) { ... }

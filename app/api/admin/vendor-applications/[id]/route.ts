@@ -1,25 +1,23 @@
-// app/api/vendor-applications/[id]/route.ts
-
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE;
+export const runtime = "nodejs";
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error(
-    "Supabase env vars missing in /api/vendor-applications/[id]"
-  );
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
 
-const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { persistSession: false },
+});
+
+type Params = { id: string };
 
 export async function GET(
-  req: Request,
-  context: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
 ) {
   try {
-    const id = context.params?.id;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
@@ -28,7 +26,6 @@ export async function GET(
       );
     }
 
-    // id can be uuid string, so we just compare as string
     const { data, error } = await supabase
       .from("vendor_applications")
       .select("*")
@@ -36,31 +33,16 @@ export async function GET(
       .single();
 
     if (error) {
-      console.error("SUPABASE GET ERROR vendor_applications/[id]:", error);
       return NextResponse.json(
         { ok: false, error: error.message },
         { status: 500 }
       );
     }
 
-    if (!data) {
-      return NextResponse.json(
-        { ok: false, error: "Application not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      application: data,
-    });
+    return NextResponse.json({ ok: true, application: data });
   } catch (err: any) {
-    console.error(
-      "UNCAUGHT ERROR in /api/vendor-applications/[id]:",
-      err
-    );
     return NextResponse.json(
-      { ok: false, error: err?.message || "Unknown server error" },
+      { ok: false, error: err?.message || "Unknown error" },
       { status: 500 }
     );
   }

@@ -20,6 +20,7 @@
     "next": "16.0.4",
     "nodemailer": "^7.0.11",
     "openai": "^6.9.1",
+    "poplib": "^0.1.7",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "resend": "^6.5.2",

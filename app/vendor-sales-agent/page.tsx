@@ -4,12 +4,6 @@
 
 import Link from "next/link";
 
-export const metadata = {
-  title: "Vendor Sales Agent | 5 Star Weddings",
-  description:
-    "Share a little about your brand and let our AI concierge show you how 5 Star Weddings can bring you more high-value destination enquiries.",
-};
-
 export default function VendorSalesAgentPage() {
   return (
     <main
@@ -27,7 +21,6 @@ export default function VendorSalesAgentPage() {
           margin: "0 auto",
         }}
       >
-        {/* Header / intro */}
         <section style={{ marginBottom: 32, textAlign: "center" }}>
           <p
             style={{
@@ -66,15 +59,14 @@ export default function VendorSalesAgentPage() {
           </p>
         </section>
 
-        {/* Two column layout: left benefits, right chat */}
         <section
+          className="vendorSalesGrid"
           style={{
             display: "grid",
             gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 1.1fr)",
             gap: 24,
           }}
         >
-          {/* Left: sales copy and CTAs */}
           <div
             style={{
               backgroundColor: "#ffffff",
@@ -183,7 +175,6 @@ export default function VendorSalesAgentPage() {
             </p>
           </div>
 
-          {/* Right: embedded chat (full page, not the bubble) */}
           <div
             style={{
               backgroundColor: "#ffffff",
@@ -240,11 +231,10 @@ export default function VendorSalesAgentPage() {
           </div>
         </section>
 
-        {/* Mobile layout tweak */}
-        <style jsx>{`
+        <style>{`
           @media (max-width: 840px) {
-            section:nth-of-type(2) {
-              grid-template-columns: minmax(0, 1fr);
+            .vendorSalesGrid {
+              grid-template-columns: minmax(0, 1fr) !important;
             }
           }
         `}</style>

@@ -1,3 +1,5 @@
+"use client";
+
 // app/vendor-sales-agent/page.tsx
 
 import Link from "next/link";

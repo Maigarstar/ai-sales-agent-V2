@@ -1,87 +1,98 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 
-import Alert from '../../components/ui/Alert/Alert'
+// FIX: Update these 3 imports to use the relative path matching your project structure
+import Input from '../../components/ui/Input/Input'
 import Button from '../../components/ui/Button/Button'
-import ActionLink from '../../components/shared/ActionLink'
-import useTimeOutMessage from '../../utils/hooks/useTimeOutMessage'
+import { FormItem, Form } from '../../components/ui/Form/Form'
 
-// 1. Import the original form
-import ForgotPasswordFormOriginal from './ForgotPasswordForm'
-import type { OnForgotPasswordSubmit } from './ForgotPasswordForm'
+import { useForm, Controller } from 'react-hook-form'
+import { z } from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
+import type { CommonProps } from '@/@types/common'
 
-// 2. FIX: Create a "loose" version of the form so TypeScript allows the Button inside
-const ForgotPasswordForm = ForgotPasswordFormOriginal as any
+// Define the form schema
+const validationSchema = z.object({
+    email: z.string().email().min(1, { message: 'Please enter your email' }),
+})
 
-type ForgotPasswordProps = {
-  signInUrl?: string
-  onForgotPasswordSubmit?: OnForgotPasswordSubmit
+export type OnForgotPasswordSubmit = (
+    values: z.infer<typeof validationSchema>,
+    setSubmitting: (isSubmitting: boolean) => void
+) => void
+
+export interface ForgotPasswordFormProps extends CommonProps {
+    emailSent: boolean
+    setMessage: (message: string) => void
+    setEmailSent: (complete: boolean) => void
+    onForgotPasswordSubmit?: OnForgotPasswordSubmit
 }
 
-export const ForgotPassword = ({
-  signInUrl = '/sign-in',
-  onForgotPasswordSubmit,
-}: ForgotPasswordProps) => {
-  const [emailSent, setEmailSent] = useState(false)
-  const [message, setMessage] = useTimeOutMessage()
-  const router = useRouter()
+const ForgotPasswordForm = (props: ForgotPasswordFormProps) => {
+    const {
+        emailSent,
+        setMessage,
+        setEmailSent,
+        onForgotPasswordSubmit,
+        children,
+        className,
+    } = props
 
-  const handleContinue = () => {
-    router.push(signInUrl)
-  }
+    const {
+        control,
+        handleSubmit,
+        formState: { errors },
+    } = useForm<z.infer<typeof validationSchema>>({
+        resolver: zodResolver(validationSchema),
+        defaultValues: {
+            email: '',
+        },
+    })
 
-  return (
-    <div>
-      <div className="mb-6">
-        {emailSent ? (
-          <>
-            <h3 className="mb-2">Check your email</h3>
-            <p className="font-semibold heading-text">
-              We have sent a password recovery to your email
-            </p>
-          </>
-        ) : (
-          <>
-            <h3 className="mb-2">Forgot Password</h3>
-            <p className="font-semibold heading-text">
-              Please enter your email to receive a verification code
-            </p>
-          </>
-        )}
-      </div>
+    const onFormSubmit = (values: z.infer<typeof validationSchema>) => {
+        const { email } = values
+        if (emailSent) {
+            setEmailSent(false)
+            return
+        }
+        onForgotPasswordSubmit?.(values, (isSubmitting) => {
+            if (!isSubmitting) {
+                setEmailSent(true)
+            }
+        })
+    }
 
-      {message && (
-        <Alert showIcon className="mb-4" type="danger">
-          <span className="break-all">{message}</span>
-        </Alert>
-      )}
-
-      {/* Now this works because we used 'as any' above */}
-      <ForgotPasswordForm
-        emailSent={emailSent}
-        setMessage={setMessage}
-        setEmailSent={setEmailSent}
-        onForgotPasswordSubmit={onForgotPasswordSubmit}
-      >
-        <Button block variant="solid" type="button" onClick={handleContinue}>
-          Continue
-        </Button>
-      </ForgotPasswordForm>
-
-      <div className="mt-4 text-center">
-        <span>Back to </span>
-        <ActionLink
-          href={signInUrl}
-          className="heading-text font-bold"
-          themeColor={false}
-        >
-          Sign in
-        </ActionLink>
-      </div>
-    </div>
-  )
+    return (
+        <div className={className}>
+            <Form
+                layout="vertical"
+                onFinish={handleSubmit(onFormSubmit)}
+            >
+                <FormItem
+                    label="Email"
+                    invalid={Boolean(errors.email)}
+                    errorMessage={errors.email?.message}
+                >
+                    <Controller
+                        name="email"
+                        control={control}
+                        render={({ field }) => (
+                            <Input
+                                {...field}
+                                type="email"
+                                placeholder="Email"
+                                autoComplete="off"
+                            />
+                        )}
+                    />
+                </FormItem>
+                <FormItem>
+                    {children}
+                </FormItem>
+            </Form>
+        </div>
+    )
 }
 
-export default ForgotPassword
+export default ForgotPasswordForm

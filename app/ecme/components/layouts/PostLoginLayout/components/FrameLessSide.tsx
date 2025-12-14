@@ -20,44 +20,51 @@ const FrameLessSide = ({ children }: CommonProps) => {
             adaptiveCardActive
             type={LAYOUT_FRAMELESS_SIDE}
             className="app-layout-frameless-side flex flex-auto flex-col bg-gray-950"
-            pageContainerReassemble={({
-                children: pageChildren,
-                defaultClass,
-                pageContainerGutterClass,
-                pageContainerDefaultClass,
-                footer,
-                header,
-                PageContainerBody,
-                PageContainerFooter,
-                PageContainerHeader,
-            }) => (
-                <div
-                    className={classNames(
-                        defaultClass,
-                        'rounded-2xl bg-white dark:bg-gray-900',
-                    )}
-                >
-                    <main className="h-full">
-                        <div
-                            className={classNames(
-                                pageContainerDefaultClass,
-                                pageContainerGutterClass,
-                                'container mx-auto pb-0 sm:pb-0 md:pb-0',
-                            )}
-                        >
-                            <PageContainerHeader {...header} gutterLess={false} />
-                            <PageContainerBody pageContainerType="contained">
-                                {pageChildren}
-                            </PageContainerBody>
-                        </div>
-                    </main>
+            pageContainerReassemble={(args: any) => {
+                const {
+                    children: pageChildren,
+                    defaultClass,
+                    pageContainerGutterClass,
+                    pageContainerDefaultClass,
+                    footer,
+                    header,
+                    PageContainerBody,
+                    PageContainerFooter,
+                    PageContainerHeader,
+                } = args
 
-                    <PageContainerFooter
-                        footer={footer}
-                        pageContainerType={'contained' as any}
-                    />
-                </div>
-            )}
+                return (
+                    <div
+                        className={classNames(
+                            defaultClass,
+                            'rounded-2xl bg-white dark:bg-gray-900',
+                        )}
+                    >
+                        <main className="h-full">
+                            <div
+                                className={classNames(
+                                    pageContainerDefaultClass,
+                                    pageContainerGutterClass,
+                                    'container mx-auto pb-0 sm:pb-0 md:pb-0',
+                                )}
+                            >
+                                <PageContainerHeader
+                                    {...header}
+                                    gutterLess={false}
+                                />
+                                <PageContainerBody pageContainerType="contained">
+                                    {pageChildren}
+                                </PageContainerBody>
+                            </div>
+                        </main>
+
+                        <PageContainerFooter
+                            footer={footer}
+                            pageContainerType={'contained' as any}
+                        />
+                    </div>
+                )
+            }}
         >
             <div className="flex flex-auto min-w-0">
                 <SideNav

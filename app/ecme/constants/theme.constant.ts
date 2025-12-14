@@ -8,3 +8,4 @@ export const LAYOUT_STACKED_SIDE = 'stackedSide' as const
 export const LAYOUT_TOP_BAR_CLASSIC = 'topBarClassic' as const
 export const LAYOUT_FRAMED_SIDE = 'framedSide' as const
 export const LAYOUT_COLLAPSIBLE_SIDE = 'collapsibleSide' as const
+export const LAYOUT_CONTENT_OVERLAY = 'contentOverlay' as const

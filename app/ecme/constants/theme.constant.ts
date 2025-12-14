@@ -9,11 +9,4 @@ export const LAYOUT_TOP_BAR_CLASSIC = 'topBarClassic' as const
 export const LAYOUT_FRAMED_SIDE = 'framedSide' as const
 export const LAYOUT_COLLAPSIBLE_SIDE = 'collapsibleSide' as const
 export const LAYOUT_CONTENT_OVERLAY = 'contentOverlay' as const
-
-export const LAYOUT_BLANK = 'blank'
-export const LAYOUT_COLLAPSIBLE_SIDE = 'collapsibleSide'
-export const LAYOUT_CONTENT_OVERLAY = 'contentOverlay'
-
-// If your file already has LAYOUT_FRAMED_SIDE, keep it as is
-// This line makes FrameLessSide compile without changing any imports
-export const LAYOUT_FRAMELESS_SIDE = LAYOUT_FRAMED_SIDE
+export const LAYOUT_FRAMELESS_SIDE = 'framelessSide' as const

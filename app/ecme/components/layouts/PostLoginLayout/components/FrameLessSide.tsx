@@ -25,6 +25,8 @@ const FrameLessSide = ({ children }: CommonProps) => {
                 defaultClass,
                 pageContainerGutterClass,
                 pageContainerDefaultClass,
+                footer,
+                header,
                 PageContainerBody,
                 PageContainerFooter,
                 PageContainerHeader,
@@ -43,14 +45,17 @@ const FrameLessSide = ({ children }: CommonProps) => {
                                 'container mx-auto pb-0 sm:pb-0 md:pb-0',
                             )}
                         >
-                            <PageContainerHeader gutterLess={false} />
+                            <PageContainerHeader {...header} gutterLess={false} />
                             <PageContainerBody pageContainerType="contained">
                                 {pageChildren}
                             </PageContainerBody>
                         </div>
                     </main>
 
-                    <PageContainerFooter />
+                    <PageContainerFooter
+                        footer={footer}
+                        pageContainerType={'contained' as any}
+                    />
                 </div>
             )}
         >

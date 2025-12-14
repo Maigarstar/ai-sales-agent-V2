@@ -6,11 +6,10 @@ import classNames from '../utils/classNames'
 import useTimeout from '../hooks/useTimeout'
 import CloseButton from '../CloseButton'
 import StatusIcon from '../StatusIcon'
-import type { TypeAttributes, CommonProps } from '../@types/common'
 import { motion } from 'framer-motion'
+import type { TypeAttributes } from '../types/common'
 
-export interface AlertProps extends CommonProps {
-    children?: ReactNode
+export interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
     closable?: boolean
     customClose?: ReactNode | string
     customIcon?: ReactNode | string

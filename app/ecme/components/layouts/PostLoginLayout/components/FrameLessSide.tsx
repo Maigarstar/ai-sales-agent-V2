@@ -5,13 +5,12 @@ import Header from '@/components/template/Header'
 import FrameLessGap from '@/components/template/FrameLessGap'
 import MobileNav from '@/components/template/MobileNav'
 import SideNavToggle from '@/components/template/SideNavToggle'
-import UserProfileDropdown from '@/components//template/UserProfileDropdown'
-import LayoutBase from '@/components//template/LayoutBase'
+import UserProfileDropdown from '@/components/template/UserProfileDropdown'
+import LayoutBase from '@/components/template/LayoutBase'
 import classNames from '@/utils/classNames'
 import useScrollTop from '@/utils/hooks/useScrollTop'
 import { LAYOUT_FRAMELESS_SIDE } from '@/constants/theme.constant'
 import type { CommonProps } from '@/@types/common'
-import type { FooterPageContainerType } from '@/components/template/Footer'
 
 const FrameLessSide = ({ children }: CommonProps) => {
     const { isSticky } = useScrollTop()
@@ -22,13 +21,9 @@ const FrameLessSide = ({ children }: CommonProps) => {
             type={LAYOUT_FRAMELESS_SIDE}
             className="app-layout-frameless-side flex flex-auto flex-col bg-gray-950"
             pageContainerReassemble={({
-                pageContainerType,
-                pageBackgroundType,
-                pageContainerGutterClass,
-                children,
-                footer,
-                header,
+                children: pageChildren,
                 defaultClass,
+                pageContainerGutterClass,
                 pageContainerDefaultClass,
                 PageContainerBody,
                 PageContainerFooter,
@@ -37,39 +32,25 @@ const FrameLessSide = ({ children }: CommonProps) => {
                 <div
                     className={classNames(
                         defaultClass,
-                        'rounded-2xl',
-                        pageBackgroundType === 'plain' &&
-                            'bg-white dark:bg-gray-900',
+                        'rounded-2xl bg-white dark:bg-gray-900',
                     )}
                 >
                     <main className="h-full">
                         <div
                             className={classNames(
                                 pageContainerDefaultClass,
-                                pageContainerType !== 'gutterless' &&
-                                    pageContainerGutterClass,
-                                pageContainerType === 'contained' &&
-                                    'container mx-auto',
-                                !footer && 'pb-0 sm:pb-0 md:pb-0',
+                                pageContainerGutterClass,
+                                'container mx-auto pb-0 sm:pb-0 md:pb-0',
                             )}
                         >
-                            <PageContainerHeader
-                                {...header}
-                                gutterLess={pageContainerType === 'gutterless'}
-                            />
-                            <PageContainerBody
-                                pageContainerType={pageContainerType}
-                            >
-                                {children}
+                            <PageContainerHeader gutterLess={false} />
+                            <PageContainerBody pageContainerType="contained">
+                                {pageChildren}
                             </PageContainerBody>
                         </div>
                     </main>
-                    <PageContainerFooter
-                        footer={footer}
-                        pageContainerType={
-                            pageContainerType as FooterPageContainerType
-                        }
-                    />
+
+                    <PageContainerFooter />
                 </div>
             )}
         >
@@ -80,6 +61,7 @@ const FrameLessSide = ({ children }: CommonProps) => {
                     contentClass="h-[calc(100vh-8rem)]"
                     mode="dark"
                 />
+
                 <FrameLessGap className="min-h-screen min-w-0 relative w-full">
                     <div className="bg-white dark:bg-gray-900 flex flex-col flex-1 h-full rounded-2xl">
                         <Header
@@ -99,6 +81,7 @@ const FrameLessSide = ({ children }: CommonProps) => {
                                 </>
                             }
                         />
+
                         <div className="h-full flex flex-auto flex-col">
                             {children}
                         </div>

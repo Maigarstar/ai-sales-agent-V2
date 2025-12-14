@@ -19,6 +19,7 @@
     "@mantine/tiptap": "^8.3.9",
     "@supabase/supabase-js": "^2.86.2",
     "@tailwindcss/typography": "^0.5.19",
+    "@tanstack/react-table": "^8.21.3",
     "@tiptap/extension-placeholder": "^3.13.0",
     "@tiptap/react": "^3.13.0",
     "@tiptap/starter-kit": "^3.13.0",

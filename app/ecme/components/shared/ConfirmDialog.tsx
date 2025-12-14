@@ -1,3 +1,5 @@
+'use client'
+
 import {
     HiCheckCircle,
     HiOutlineInformationCircle,
@@ -14,6 +16,7 @@ import type { ButtonProps } from '@/components/ui/Button'
 type StatusType = 'info' | 'success' | 'warning' | 'danger'
 
 interface ConfirmDialogProps extends DialogProps {
+    children?: ReactNode
     cancelText?: ReactNode | string
     confirmText?: ReactNode | string
     confirmButtonProps?: ButtonProps
@@ -70,7 +73,6 @@ const StatusIcon = ({ status }: { status: StatusType }) => {
                     </span>
                 </Avatar>
             )
-
         default:
             return null
     }

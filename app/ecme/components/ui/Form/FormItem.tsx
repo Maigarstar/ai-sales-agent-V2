@@ -1,12 +1,18 @@
-import classNames from '../utils/classNames'
+'use client'
+
 import { motion, AnimatePresence } from 'framer-motion'
+import classNames from '../utils/classNames'
 import { useForm, FormItemContextProvider } from './context'
 import { useConfig } from '../ConfigProvider'
 import { CONTROL_SIZES, LAYOUT } from '../utils/constants'
-import type { CommonProps, TypeAttributes } from '../@types/common'
-import type { ReactNode, Ref } from 'react'
+import type { CommonProps, TypeAttributes } from '../types/common'
+import type { CSSProperties, ReactNode, Ref } from 'react'
 
 export interface FormItemProps extends CommonProps {
+    children?: ReactNode
+    className?: string
+    style?: CSSProperties
+
     asterisk?: boolean
     errorMessage?: string
     extra?: string | ReactNode
@@ -81,7 +87,6 @@ const FormItem = (props: FormItemProps) => {
         if (formItemLayout === LAYOUT.HORIZONTAL) {
             return { ...style, ...{ minWidth: formItemLabelWidth } }
         }
-
         return { ...style }
     }
 
@@ -90,7 +95,7 @@ const FormItem = (props: FormItemProps) => {
     const initialStyle = exitStyle
 
     return (
-        <FormItemContextProvider value={{ invalid }}>
+        <FormItemContextProvider value={{ invalid: Boolean(invalid) }}>
             <div ref={ref} className={formItemClass}>
                 <label
                     htmlFor={htmlFor}
@@ -106,6 +111,7 @@ const FormItem = (props: FormItemProps) => {
                     {extra && <span>{extra}</span>}
                     {label && formItemLayout !== 'vertical' && ':'}
                 </label>
+
                 <div
                     className={
                         formItemLayout === LAYOUT.HORIZONTAL

@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -17,46 +13,32 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+
     "baseUrl": ".",
+
     "paths": {
-      "@/*": [
-        "app/*"
-      ],
-      "@/ecme/*": [
-        "app/ecme/*"
-      ],
-      "@/components/*": [
-        "app/ecme/components/*",
-        "app/components/*"
-      ],
-      "@/utils/*": [
-        "app/ecme/utils/*",
-        "app/utils/*"
-      ],
-      "@/configs/*": [
-        "app/ecme/configs/*",
-        "app/configs/*"
-      ],
-      "@/constants/*": [
-        "app/ecme/constants/*",
-        "app/constants/*"
-      ],
-      "@/@types/*": [
-        "@types/*"
-      ],
-      "@/lib/*": [
-        "app/lib/*"
-      ],
-      "@/admin/*": [
-        "app/admin/*"
-      ]
+      "@/*": ["app/*"],
+
+      "@/ecme/*": ["app/ecme/*"],
+
+      "@/components/*": ["app/ecme/components/*", "app/components/*"],
+      "@/utils/*": ["app/ecme/utils/*", "app/utils/*"],
+      "@/configs/*": ["app/ecme/configs/*", "app/configs/*"],
+      "@/constants/*": ["app/ecme/constants/*", "app/constants/*"],
+
+      "@/@types/*": ["app/ecme/types/*"],
+
+      "@/lib/*": ["app/lib/*"],
+      "@/admin/*": ["app/admin/*"]
     },
+
     "plugins": [
       {
         "name": "next"
       }
     ]
   },
+
   "include": [
     "next-env.d.ts",
     "**/*.ts",
@@ -69,7 +51,6 @@
     "app/lib/supabaseClient.js",
     "app/api/admin/vendor-applications/[id]/route.ts--old"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+
+  "exclude": ["node_modules"]
 }

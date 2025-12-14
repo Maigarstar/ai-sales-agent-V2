@@ -1,13 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-// FIX: Relative path to where the file actually lives
+
+// FIX 1: Pointing to app/ecme/components/ui/...
 import Alert from '../../components/ui/Alert/Alert'
-// FIX: Assuming Button is in the same folder structure
 import Button from '../../components/ui/Button/Button'
-import ActionLink from '@/components/shared/ActionLink'
+
+// FIX 2: Pointing to app/ecme/components/shared/ActionLink
+import ActionLink from '../../components/shared/ActionLink'
+
+// FIX 3: Pointing to app/ecme/utils/hooks/...
+import useTimeOutMessage from '../../utils/hooks/useTimeOutMessage'
+
 import ForgotPasswordForm from './ForgotPasswordForm'
-import useTimeOutMessage from '@/utils/hooks/useTimeOutMessage'
 import { useRouter } from 'next/navigation'
 import type { OnForgotPasswordSubmit } from './ForgotPasswordForm'
 

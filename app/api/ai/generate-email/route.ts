@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+// app/api/ai/generate-email/route.ts
+
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -26,7 +28,7 @@ function buildEmail(p: GenerateEmailPayload) {
     `Dear ${toName},\n\n` +
     `I wanted to reach out personally, as ${brand} has long stood out to us as a property of rare charm and distinction.\n\n` +
     `We introduce our brand as 5 Star Weddings, The Luxury Wedding Collection.\n` +
-    `We spotlight a select number of iconic venues in our luxury wedding directory, complemented by refined editorial, tailored visibility, and direct introductions to high net worth couples planning celebrations in Paris and beyond.\n\n` +
+    `We spotlight a select number of iconic venues in our luxury wedding collection, complemented by refined editorial, tailored visibility, and direct introductions to high net worth couples planning celebrations in Paris and beyond.\n\n` +
     (notes ? `A quick note for context, ${notes}\n\n` : "") +
     `If you can share the best wedding contact, I will send a private one page brief with what we would feature and how it would look.\n\n` +
     `Warm regards,\n` +
@@ -39,7 +41,7 @@ export async function GET() {
   return NextResponse.json({ ok: true });
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as GenerateEmailPayload;
     const email = buildEmail(payload || {});

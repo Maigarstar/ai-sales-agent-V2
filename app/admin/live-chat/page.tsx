@@ -59,10 +59,9 @@ function getStatusColour(status: string | null | undefined): {
   color: string;
 } {
   const raw = (status || "").toLowerCase();
-  if (raw === "in_progress")
-    return { bg: "#e4f4ea", color: "#1d6b3b" }; // green
+  if (raw === "in_progress") return { bg: "#e4f4ea", color: "#1d6b3b" };
   if (raw === "done") return { bg: "#f1f1f1", color: "#777" };
-  return { bg: "#fff3e6", color: "#cc692b" }; // new/open
+  return { bg: "#fff3e6", color: "#cc692b" };
 }
 
 function getSummary(row: ConversationRow): string {
@@ -86,7 +85,9 @@ export default function LiveChatQueuePage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    if (!supabase) {
+    const sb = supabase;
+
+    if (!sb) {
       setErrorMessage(
         "Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
       );
@@ -99,10 +100,7 @@ export default function LiveChatQueuePage() {
       setLoading(true);
       setErrorMessage("");
 
-      // IMPORTANT PART:
-      // include all conversations that are NOT done:
-      // status null, new, open, in_progress
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from("conversations")
         .select("*")
         .or("status.is.null,status.eq.new,status.eq.open,status.eq.in_progress")
@@ -127,8 +125,7 @@ export default function LiveChatQueuePage() {
 
     void loadQueue();
 
-    // realtime keep queue fresh
-    const channel = supabase
+    const channel = sb
       .channel("live-chat-queue")
       .on(
         "postgres_changes",
@@ -138,7 +135,6 @@ export default function LiveChatQueuePage() {
             const newRow = payload.new as ConversationRow | null;
             const oldRow = payload.old as ConversationRow | null;
 
-            // helper to know if a row should be in the queue
             function isActive(row: ConversationRow | null): boolean {
               if (!row) return false;
               const raw = (row.status || "").toLowerCase();
@@ -157,9 +153,7 @@ export default function LiveChatQueuePage() {
               const merged = exists
                 ? current.map((r) => (r.id === newRow.id ? newRow : r))
                 : [newRow, ...current];
-              return merged.sort((a, b) =>
-                a.updated_at < b.updated_at ? 1 : -1
-              );
+              return merged.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
             }
 
             if (payload.eventType === "UPDATE" && newRow) {
@@ -175,9 +169,7 @@ export default function LiveChatQueuePage() {
                 next = current.filter((r) => r.id !== newRow.id);
               }
 
-              return next.sort((a, b) =>
-                a.updated_at < b.updated_at ? 1 : -1
-              );
+              return next.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
             }
 
             if (payload.eventType === "DELETE" && oldRow) {
@@ -192,7 +184,7 @@ export default function LiveChatQueuePage() {
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      sb.removeChannel(channel);
     };
   }, []);
 
@@ -256,7 +248,6 @@ export default function LiveChatQueuePage() {
             overflow: "hidden",
           }}
         >
-          {/* header row */}
           <div
             style={{
               display: "grid",
@@ -274,25 +265,13 @@ export default function LiveChatQueuePage() {
           </div>
 
           {loading && rows.length === 0 && (
-            <div
-              style={{
-                padding: 20,
-                fontSize: 13,
-                color: "#666",
-              }}
-            >
+            <div style={{ padding: 20, fontSize: 13, color: "#666" }}>
               Loading live chats.
             </div>
           )}
 
           {!loading && rows.length === 0 && (
-            <div
-              style={{
-                padding: 20,
-                fontSize: 13,
-                color: "#666",
-              }}
-            >
+            <div style={{ padding: 20, fontSize: 13, color: "#666" }}>
               There are no active live chats at the moment.
             </div>
           )}
@@ -313,22 +292,13 @@ export default function LiveChatQueuePage() {
                   alignItems: "center",
                 }}
               >
-                <div style={{ color: "#555" }}>
-                  {formatCreated(row.created_at)}
-                </div>
-
+                <div style={{ color: "#555" }}>{formatCreated(row.created_at)}</div>
                 <div style={{ color: "#333" }}>{getTypeLabel(row)}</div>
 
                 <div>
                   <div style={{ color: "#222" }}>{getSummary(row)}</div>
                   {contactSnippet && (
-                    <div
-                      style={{
-                        marginTop: 4,
-                        fontSize: 12,
-                        color: "#777",
-                      }}
-                    >
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#777" }}>
                       Contact: {contactSnippet}
                     </div>
                   )}
@@ -371,14 +341,7 @@ export default function LiveChatQueuePage() {
           })}
         </div>
 
-        <div
-          style={{
-            marginTop: 12,
-            fontSize: 11,
-            color: "#999",
-            textAlign: "right",
-          }}
-        >
+        <div style={{ marginTop: 12, fontSize: 11, color: "#999", textAlign: "right" }}>
           Powered by Taigenic AI
         </div>
       </div>

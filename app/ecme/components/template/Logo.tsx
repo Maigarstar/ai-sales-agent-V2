@@ -1,7 +1,7 @@
 import classNames from 'classnames'
-import { APP_NAME } from '@/constants/app.constant'
+import { APP_NAME } from '../../constants/app.constant'
 import Image from 'next/image'
-import type { CommonProps } from '@/@types/common'
+import type { CommonProps } from '../../@types/common'
 
 interface LogoProps extends CommonProps {
     type?: 'full' | 'streamline'

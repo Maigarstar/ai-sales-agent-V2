@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import { FormItem, Form } from '@/components/ui/Form'
 import PasswordInput from '@/components/shared/PasswordInput'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import type { ReactNode } from 'react'
 import type { CommonProps } from '@/@types/common'
 
 type ResetPasswordFormSchema = {
@@ -21,7 +22,9 @@ export type OnResetPasswordSubmitPayload = {
     setResetComplete?: (complete: boolean) => void
 }
 
-export type OnResetPasswordSubmit = (payload: OnResetPasswordSubmitPayload) => void
+export type OnResetPasswordSubmit = (
+    payload: OnResetPasswordSubmitPayload,
+) => void
 
 interface ResetPasswordFormProps extends CommonProps {
     onResetPasswordSubmit?: OnResetPasswordSubmit
@@ -112,8 +115,13 @@ const ResetPasswordForm = (props: ResetPasswordFormProps) => {
                         />
                     </FormItem>
 
-                    <Button block loading={isSubmitting} variant="solid" type="submit">
-                        {isSubmitting ? 'Submitting...' : 'Submit'}
+                    <Button
+                        block
+                        loading={isSubmitting}
+                        variant="solid"
+                        type="submit"
+                    >
+                        {isSubmitting ? 'Submiting...' : 'Submit'}
                     </Button>
                 </Form>
             ) : (

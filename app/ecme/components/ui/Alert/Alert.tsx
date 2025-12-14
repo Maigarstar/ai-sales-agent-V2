@@ -1,15 +1,25 @@
 'use client'
 
-import { useState, forwardRef } from 'react'
-import type { ReactNode, MouseEvent } from 'react'
+import { useState } from 'react'
 import classNames from '../utils/classNames'
 import useTimeout from '../hooks/useTimeout'
+import {
+    HiCheckCircle,
+    HiInformationCircle,
+    HiExclamation,
+    HiXCircle,
+} from 'react-icons/hi'
+import { motion } from 'framer-motion'
 import CloseButton from '../CloseButton'
 import StatusIcon from '../StatusIcon'
-import { motion } from 'framer-motion'
-import type { TypeAttributes } from '../types/common'
+import type { TypeAttributes, CommonProps } from '../types/common'
+import type { ReactNode, MouseEvent, Ref, CSSProperties } from 'react'
 
-export interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface AlertProps extends CommonProps {
+    children?: ReactNode
+    className?: string
+    style?: CSSProperties
+
     closable?: boolean
     customClose?: ReactNode | string
     customIcon?: ReactNode | string
@@ -19,53 +29,45 @@ export interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
     showIcon?: boolean
     triggerByToast?: boolean
     type?: TypeAttributes.Status
+    ref?: Ref<HTMLDivElement>
 }
 
 const DEFAULT_TYPE: TypeAttributes.Status = 'warning'
 
-const TYPE_MAP: Record<
-    TypeAttributes.Status,
-    {
-        backgroundColor: string
-        titleColor: string
-        textColor: string
-        iconColor: string
-    }
-> = {
+const TYPE_MAP = {
     success: {
         backgroundColor: 'bg-success-subtle',
         titleColor: 'text-success',
         textColor: 'text-success',
         iconColor: 'text-success',
+        icon: <HiCheckCircle />,
     },
     info: {
         backgroundColor: 'bg-info-subtle',
         titleColor: 'text-info',
         textColor: 'text-info',
         iconColor: 'text-info',
+        icon: <HiInformationCircle />,
     },
     warning: {
         backgroundColor: 'bg-warning-subtle',
         titleColor: 'text-warning',
         textColor: 'text-warning',
         iconColor: 'text-warning',
+        icon: <HiExclamation />,
     },
     danger: {
         backgroundColor: 'bg-error-subtle',
         titleColor: 'text-error',
         textColor: 'text-error',
         iconColor: 'text-error',
+        icon: <HiXCircle />,
     },
-}
+} as const
 
-const TYPE_ARRAY: TypeAttributes.Status[] = [
-    'success',
-    'danger',
-    'info',
-    'warning',
-]
+const TYPE_ARRAY: TypeAttributes.Status[] = ['success', 'danger', 'info', 'warning']
 
-const Alert = forwardRef<HTMLDivElement, AlertProps>((props, ref) => {
+const Alert = (props: AlertProps) => {
     const {
         children,
         className,
@@ -75,6 +77,7 @@ const Alert = forwardRef<HTMLDivElement, AlertProps>((props, ref) => {
         duration = 3000,
         title = null,
         onClose,
+        ref,
         showIcon = false,
         triggerByToast = false,
         ...rest
@@ -91,18 +94,16 @@ const Alert = forwardRef<HTMLDivElement, AlertProps>((props, ref) => {
 
     const [display, setDisplay] = useState<'show' | 'hiding' | 'hide'>('show')
 
-    const { clear } = useTimeout(
-        onClose as () => void,
-        duration,
-        duration > 0,
-    )
+    const { clear } = useTimeout(onClose as () => void, duration, duration > 0)
 
     const handleClose = (e: MouseEvent<HTMLDivElement>) => {
         setDisplay('hiding')
         onClose?.(e)
         clear()
         if (!triggerByToast) {
-            setTimeout(() => setDisplay('hide'), 400)
+            setTimeout(() => {
+                setDisplay('hide')
+            }, 400)
         }
     }
 
@@ -163,7 +164,6 @@ const Alert = forwardRef<HTMLDivElement, AlertProps>((props, ref) => {
                         type={type}
                     />
                 )}
-
                 <div>
                     {title ? (
                         <div
@@ -175,16 +175,12 @@ const Alert = forwardRef<HTMLDivElement, AlertProps>((props, ref) => {
                             {title}
                         </div>
                     ) : null}
-
                     {children}
                 </div>
             </div>
-
             {closable ? renderClose() : null}
         </motion.div>
     )
-})
-
-Alert.displayName = 'Alert'
+}
 
 export default Alert

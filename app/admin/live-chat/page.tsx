@@ -94,6 +94,8 @@ export default function LiveChatQueuePage() {
       return;
     }
 
+    const sb = supabase; // this is now guaranteed, and TS is happy
+
     let cancelled = false;
 
     async function loadQueue() {
@@ -110,7 +112,7 @@ export default function LiveChatQueuePage() {
       if (cancelled) return;
 
       if (error) {
-        console.error("live-chat queue error", error);
+        console.error("live chat queue error", error);
         setErrorMessage(
           `Could not load live chat queue: ${
             (error as any)?.message ?? "Unknown error"
@@ -216,6 +218,7 @@ export default function LiveChatQueuePage() {
         >
           Live chat queue
         </h1>
+
         <p
           style={{
             margin: "8px 0 24px 0",
@@ -327,11 +330,7 @@ export default function LiveChatQueuePage() {
 
                   <Link
                     href={`/admin/conversations/${row.id}`}
-                    style={{
-                      fontSize: 12,
-                      color: "#183F34",
-                      textDecoration: "none",
-                    }}
+                    style={{ fontSize: 12, color: "#183F34", textDecoration: "none" }}
                   >
                     Open conversation
                   </Link>

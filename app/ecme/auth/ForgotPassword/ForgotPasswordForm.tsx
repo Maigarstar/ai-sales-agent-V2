@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-// FIX 1: Correct relative paths for Input and Button
+
+// FIX 1: Point to the FOLDER ('.../ui/Form') so we get both Form and FormItem
+import { FormItem, Form } from '../../components/ui/Form'
+
+// FIX 2: Correct relative paths for Input and Button
 import Input from '../../components/ui/Input/Input'
 import Button from '../../components/ui/Button/Button'
-// FIX 2: Import Form and FormItem from the folder (index.tsx) to avoid export errors
-import { FormItem, Form } from '../../components/ui/Form'
 
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,7 +15,7 @@ import { z } from 'zod'
 import type { CommonProps } from '@/@types/common'
 import type { ReactNode } from 'react'
 
-// FIX 3: Correct Zod syntax (z.string().email instead of z.email)
+// Validation schema
 const validationSchema = z.object({
     email: z.string().email().min(5),
 })
@@ -36,7 +38,6 @@ interface ForgotPasswordFormProps extends CommonProps {
     emailSent: boolean
     setEmailSent: (complete: boolean) => void
     setMessage: (message: string) => void
-    // FIX 4: Explicitly add children to props to prevent type errors
     children?: ReactNode
 }
 

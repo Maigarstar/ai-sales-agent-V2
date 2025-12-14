@@ -21,6 +21,7 @@ type ConversationRow = {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
+// Initialize the client (can be null if env vars are missing)
 const supabase: SupabaseClient | null =
   supabaseUrl && supabaseKey
     ? createClient(supabaseUrl, supabaseKey, {
@@ -85,20 +86,25 @@ export default function LiveChatQueuePage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    // 1. Capture the global variable
     const sb = supabase;
 
+    // 2. CHECK: If it is null, stop here.
     if (!sb) {
       setErrorMessage(
         "Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
       );
       return;
     }
-
-    const sb = supabase; // this is now guaranteed, and TS is happy
+    
+    // Now 'sb' is guaranteed to be a SupabaseClient for the rest of this function
 
     let cancelled = false;
 
     async function loadQueue() {
+      // TypeScript knows 'sb' is safe to use here because of the check above
+      if (!sb) return; 
+
       setLoading(true);
       setErrorMessage("");
 

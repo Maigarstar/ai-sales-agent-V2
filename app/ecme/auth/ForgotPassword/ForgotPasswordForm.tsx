@@ -1,17 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import Input from '@/components/ui/Input'
-import Button from '@/components/ui/Button'
-import { FormItem, Form } from '@/components/ui/Form'
+// FIX 1: Correct relative paths for Input and Button
+import Input from '../../components/ui/Input/Input'
+import Button from '../../components/ui/Button/Button'
+// FIX 2: Import Form and FormItem from the folder (index.tsx) to avoid export errors
+import { FormItem, Form } from '../../components/ui/Form'
+
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import type { CommonProps } from '@/@types/common'
+import type { ReactNode } from 'react'
 
-type ForgotPasswordFormSchema = {
-    email: string
-}
+// FIX 3: Correct Zod syntax (z.string().email instead of z.email)
+const validationSchema = z.object({
+    email: z.string().email().min(5),
+})
+
+type ForgotPasswordFormSchema = z.infer<typeof validationSchema>
 
 export type OnForgotPasswordSubmitPayload = {
     values: ForgotPasswordFormSchema
@@ -27,13 +34,11 @@ export type OnForgotPasswordSubmit = (
 interface ForgotPasswordFormProps extends CommonProps {
     onForgotPasswordSubmit?: OnForgotPasswordSubmit
     emailSent: boolean
-    setEmailSent: (compplete: boolean) => void
+    setEmailSent: (complete: boolean) => void
     setMessage: (message: string) => void
+    // FIX 4: Explicitly add children to props to prevent type errors
+    children?: ReactNode
 }
-
-const validationSchema = z.object({
-    email: z.email().min(5),
-})
 
 const ForgotPasswordForm = (props: ForgotPasswordFormProps) => {
     const [isSubmitting, setSubmitting] = useState<boolean>(false)

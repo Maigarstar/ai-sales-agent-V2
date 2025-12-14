@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Button from '@/components/ui/Button'
 import { FormItem, Form } from '@/components/ui/Form'
 import PasswordInput from '@/components/shared/PasswordInput'
@@ -21,15 +21,14 @@ export type OnResetPasswordSubmitPayload = {
     setResetComplete?: (complete: boolean) => void
 }
 
-export type OnResetPasswordSubmit = (
-    payload: OnResetPasswordSubmitPayload,
-) => void
+export type OnResetPasswordSubmit = (payload: OnResetPasswordSubmitPayload) => void
 
 interface ResetPasswordFormProps extends CommonProps {
     onResetPasswordSubmit?: OnResetPasswordSubmit
     resetComplete: boolean
     setResetComplete: (complete: boolean) => void
     setMessage: (message: string) => void
+    children?: ReactNode
 }
 
 const validationSchema = z
@@ -94,6 +93,7 @@ const ResetPasswordForm = (props: ResetPasswordFormProps) => {
                             )}
                         />
                     </FormItem>
+
                     <FormItem
                         label="Confirm Password"
                         invalid={Boolean(errors.confirmPassword)}
@@ -111,13 +111,9 @@ const ResetPasswordForm = (props: ResetPasswordFormProps) => {
                             )}
                         />
                     </FormItem>
-                    <Button
-                        block
-                        loading={isSubmitting}
-                        variant="solid"
-                        type="submit"
-                    >
-                        {isSubmitting ? 'Submiting...' : 'Submit'}
+
+                    <Button block loading={isSubmitting} variant="solid" type="submit">
+                        {isSubmitting ? 'Submitting...' : 'Submit'}
                     </Button>
                 </Form>
             ) : (

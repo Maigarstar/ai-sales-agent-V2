@@ -1,11 +1,11 @@
 'use client'
 
 import Header from '@/components/template/Header'
-import UserProfileDropdown from '@/components//template/UserProfileDropdown'
+import UserProfileDropdown from '@/components/template/UserProfileDropdown'
 import HeaderLogo from '@/components/template/HeaderLogo'
 import MobileNav from '@/components/template/MobileNav'
 import HorizontalNav from '@/components/template/HorizontalNav'
-import LayoutBase from '@/components//template/LayoutBase'
+import LayoutBase from '@/components/template/LayoutBase'
 import classNames from '@/utils/classNames'
 import useScrollTop from '@/utils/hooks/useScrollTop'
 import { LAYOUT_CONTENT_OVERLAY } from '@/constants/theme.constant'
@@ -19,74 +19,80 @@ const ContentOverlay = ({ children }: CommonProps) => {
         <LayoutBase
             type={LAYOUT_CONTENT_OVERLAY}
             className="app-layout-content-overlay flex flex-auto flex-col min-h-screen"
-            pageContainerReassemble={({
-                children,
-                defaultClass,
-                header,
-                pageBackgroundType,
-                pageContainerType,
-                pageContainerGutterClass,
-                footer,
-                PageContainerHeader,
-                PageContainerBody,
-                PageContainerFooter,
-            }) => (
-                <>
-                    <div
-                        className={classNames(
-                            defaultClass,
-                            'sm:px-0 px-4',
-                            header?.title ? '-mt-60' : '-mt-60 sm:-mt-40',
-                        )}
-                    >
-                        <main className="h-full">
-                            <div className="dark container mx-auto relative">
-                                <PageContainerHeader
-                                    {...header}
-                                    className="mb-20"
-                                    customeHeader={() => (
-                                        <>
-                                            {header?.title &&
-                                                typeof header?.title ===
-                                                    'string' && (
-                                                    <h2 className="mb-2">
-                                                        {header.title}
-                                                    </h2>
+            pageContainerReassemble={(args: any) => {
+                const {
+                    children: pageChildren,
+                    defaultClass,
+                    header,
+                    pageBackgroundType,
+                    pageContainerType,
+                    pageContainerGutterClass,
+                    footer,
+                    PageContainerHeader,
+                    PageContainerBody,
+                    PageContainerFooter,
+                } = args
+
+                return (
+                    <>
+                        <div
+                            className={classNames(
+                                defaultClass,
+                                'sm:px-0 px-4',
+                                header?.title ? '-mt-60' : '-mt-60 sm:-mt-40',
+                            )}
+                        >
+                            <main className="h-full">
+                                <div className="dark container mx-auto relative">
+                                    <PageContainerHeader
+                                        {...(header || {})}
+                                        className="mb-20"
+                                        customeHeader={() => (
+                                            <>
+                                                {header?.title &&
+                                                    typeof header?.title ===
+                                                        'string' && (
+                                                        <h2 className="mb-2">
+                                                            {header.title}
+                                                        </h2>
+                                                    )}
+                                                {header?.description && (
+                                                    <p className="text-base text-white opacity-60">
+                                                        {header.description}
+                                                    </p>
                                                 )}
-                                            {header?.description && (
-                                                <p className="text-base text-white opacity-60">
-                                                    {header.description}
-                                                </p>
-                                            )}
-                                        </>
-                                    )}
-                                />
-                            </div>
-                            <PageContainerBody pageContainerType={'contained'}>
-                                {pageBackgroundType === 'plain' ? (
-                                    <div
-                                        className={classNames(
-                                            'bg-white dark:bg-gray-900 rounded-2xl',
-                                            pageContainerGutterClass,
+                                            </>
                                         )}
-                                    >
-                                        {children}
-                                    </div>
-                                ) : (
-                                    children
-                                )}
-                                <PageContainerFooter
-                                    className="-mb-40 mt-4 md:px-0"
-                                    footer={footer}
-                                    pageContainerType={
-                                        pageContainerType as FooterPageContainerType
-                                    }
-                                />
-                            </PageContainerBody>
-                        </main>
-                    </div>
-                </>
-            )}
+                                    />
+                                </div>
+
+                                <PageContainerBody pageContainerType="contained">
+                                    {pageBackgroundType === 'plain' ? (
+                                        <div
+                                            className={classNames(
+                                                'bg-white dark:bg-gray-900 rounded-2xl',
+                                                pageContainerGutterClass,
+                                            )}
+                                        >
+                                            {pageChildren}
+                                        </div>
+                                    ) : (
+                                        pageChildren
+                                    )}
+
+                                    <PageContainerFooter
+                                        className="-mb-40 mt-4 md:px-0"
+                                        footer={footer}
+                                        pageContainerType={
+                                            pageContainerType as FooterPageContainerType
+                                        }
+                                    />
+                                </PageContainerBody>
+                            </main>
+                        </div>
+                    </>
+                )
+            }}
         >
             <div className="flex flex-auto min-w-0">
                 <div className="flex flex-col flex-auto min-h-screen min-w-0 relative w-full">
@@ -114,9 +120,11 @@ const ContentOverlay = ({ children }: CommonProps) => {
                             </>
                         }
                     />
+
                     <div className="h-[400px] bg-[linear-gradient(220deg,_rgb(9,_12,_17)_10%,_#15122f_35%,_#2b1e38_55%,_#0c2239_70%,_rgb(9,_12,_17)_90%)]">
                         <div className="container mx-auto h-full"></div>
                     </div>
+
                     {children}
                 </div>
             </div>

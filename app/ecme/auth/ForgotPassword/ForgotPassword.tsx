@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import Alert from '@/components/ui/Alert'
-import Button from '@/components/ui/Button'
+// FIX: Changed "Alert" to "alert" (lowercase) to match file name
+import Alert from '@/components/ui/alert'
+// FIX: Changed "Button" to "button" (lowercase) just in case
+import Button from '@/components/ui/button'
 import ActionLink from '@/components/shared/ActionLink'
 import ForgotPasswordForm from './ForgotPasswordForm'
 import useTimeOutMessage from '@/utils/hooks/useTimeOutMessage'

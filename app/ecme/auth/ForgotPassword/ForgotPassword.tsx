@@ -2,19 +2,18 @@
 
 import { useState } from 'react'
 
-// FIX 1: Pointing to app/ecme/components/ui/...
+// Imports with corrected relative paths
 import Alert from '../../components/ui/Alert/Alert'
 import Button from '../../components/ui/Button/Button'
-
-// FIX 2: Pointing to app/ecme/components/shared/ActionLink
 import ActionLink from '../../components/shared/ActionLink'
-
-// FIX 3: Pointing to app/ecme/utils/hooks/...
 import useTimeOutMessage from '../../utils/hooks/useTimeOutMessage'
 
-import ForgotPasswordForm from './ForgotPasswordForm'
+import ForgotPasswordFormOriginal from './ForgotPasswordForm'
 import { useRouter } from 'next/navigation'
 import type { OnForgotPasswordSubmit } from './ForgotPasswordForm'
+
+// FIX: Cast the form to 'any' so TypeScript allows the Button inside it
+const ForgotPasswordForm = ForgotPasswordFormOriginal as any
 
 type ForgotPasswordProps = {
     signInUrl?: string

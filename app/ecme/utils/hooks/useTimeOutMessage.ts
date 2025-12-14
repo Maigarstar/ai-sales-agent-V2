@@ -1,23 +1,32 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-function useTimeOutMessage(
-    interval = 3000,
-): [string, React.Dispatch<React.SetStateAction<string>>] {
-    const [message, setMessage] = useState('')
+export default function useTimeOutMessage(
+  defaultMessage = '',
+  timeout = 3000
+): [string, (msg: string) => void] {
+  const [message, setMessageState] = useState(defaultMessage)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    useEffect(() => {
-        if (message) {
-            const timeout = setTimeout(() => setMessage(''), interval)
-            return () => {
-                clearTimeout(timeout)
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [message])
+  const setMessage = (msg: string) => {
+    setMessageState(msg)
 
-    return [message, setMessage]
+    if (timerRef.current) clearTimeout(timerRef.current)
+
+    if (msg) {
+      timerRef.current = setTimeout(() => {
+        setMessageState('')
+        timerRef.current = null
+      }, timeout)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  return [message, setMessage]
 }
-
-export default useTimeOutMessage

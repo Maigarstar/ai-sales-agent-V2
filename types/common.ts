@@ -1,7 +1,6 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type React from 'react'
 
 export type CommonProps = {
-  children?: ReactNode
   className?: string
-  style?: CSSProperties
+  style?: React.CSSProperties
 }

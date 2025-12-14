@@ -1,6 +1,14 @@
-import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import AdminShell from "./_components/AdminShell";
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+export const metadata: Metadata = {
+  title: "Admin | Taigenic",
+};
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return <AdminShell>{children}</AdminShell>;
 }

@@ -3,17 +3,19 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-// FIX: Relative paths for UI components
-import Alert from '../../components/ui/Alert/Alert'
-import Button from '../../components/ui/Button/Button'
-import ActionLink from '../../components/shared/ActionLink'
-import useTimeOutMessage from '../../utils/hooks/useTimeOutMessage'
+// FIX 1: Adjust paths for UI components (Go up 2 levels to 'components', then into 'ui')
+import Alert from '../../ui/Alert/Alert'
+import Button from '../../ui/Button/Button'
+import ActionLink from '../../shared/ActionLink'
 
-// FIX: Import the form component
+// FIX 2: Adjust path for Utils (Go up 3 levels to 'ecme', then into 'utils')
+import useTimeOutMessage from '../../../utils/hooks/useTimeOutMessage'
+
+// Import the form component (Same folder, so ./ is correct)
 import ForgotPasswordFormOriginal from './ForgotPasswordForm'
 import type { OnForgotPasswordSubmit } from './ForgotPasswordForm'
 
-// FIX: "as any" trick to prevent the children type error
+// FIX 3: "as any" trick to prevent the children type error
 const ForgotPasswordForm = ForgotPasswordFormOriginal as any
 
 type ForgotPasswordProps = {

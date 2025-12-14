@@ -18,7 +18,15 @@
 
     "paths": {
       "@/*": ["app/*"],
-      "@/components/*": ["app/components/*"],
+
+      "@/ecme/*": ["app/ecme/*"],
+
+      "@/components/*": ["app/ecme/components/*", "app/components/*"],
+      "@/utils/*": ["app/ecme/utils/*", "app/utils/*"],
+      "@/configs/*": ["app/ecme/configs/*", "app/configs/*"],
+      "@/constants/*": ["app/ecme/constants/*", "app/constants/*"],
+      "@/@types/*": ["app/ecme/@types/*", "app/@types/*"],
+
       "@/lib/*": ["app/lib/*"],
       "@/admin/*": ["app/admin/*"]
     },

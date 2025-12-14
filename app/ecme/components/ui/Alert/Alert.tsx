@@ -1,19 +1,16 @@
-import { useState } from 'react'
+'use client'
+
+import { useState, forwardRef } from 'react'
+import type { ReactNode, MouseEvent } from 'react'
 import classNames from '../utils/classNames'
 import useTimeout from '../hooks/useTimeout'
-import {
-    HiCheckCircle,
-    HiInformationCircle,
-    HiExclamation,
-    HiXCircle,
-} from 'react-icons/hi'
-import { motion } from 'framer-motion'
 import CloseButton from '../CloseButton'
 import StatusIcon from '../StatusIcon'
 import type { TypeAttributes, CommonProps } from '../@types/common'
-import type { ReactNode, MouseEvent, Ref } from 'react'
+import { motion } from 'framer-motion'
 
 export interface AlertProps extends CommonProps {
+    children?: ReactNode
     closable?: boolean
     customClose?: ReactNode | string
     customIcon?: ReactNode | string
@@ -23,39 +20,42 @@ export interface AlertProps extends CommonProps {
     showIcon?: boolean
     triggerByToast?: boolean
     type?: TypeAttributes.Status
-    ref?: Ref<HTMLDivElement>
 }
 
-const DEFAULT_TYPE = 'warning'
+const DEFAULT_TYPE: TypeAttributes.Status = 'warning'
 
-const TYPE_MAP = {
+const TYPE_MAP: Record<
+    TypeAttributes.Status,
+    {
+        backgroundColor: string
+        titleColor: string
+        textColor: string
+        iconColor: string
+    }
+> = {
     success: {
         backgroundColor: 'bg-success-subtle',
         titleColor: 'text-success',
         textColor: 'text-success',
         iconColor: 'text-success',
-        icon: <HiCheckCircle />,
     },
     info: {
         backgroundColor: 'bg-info-subtle',
         titleColor: 'text-info',
         textColor: 'text-info',
         iconColor: 'text-info',
-        icon: <HiInformationCircle />,
     },
     warning: {
         backgroundColor: 'bg-warning-subtle',
         titleColor: 'text-warning',
         textColor: 'text-warning',
         iconColor: 'text-warning',
-        icon: <HiExclamation />,
     },
     danger: {
         backgroundColor: 'bg-error-subtle',
         titleColor: 'text-error',
         textColor: 'text-error',
         iconColor: 'text-error',
-        icon: <HiXCircle />,
     },
 }
 
@@ -66,7 +66,7 @@ const TYPE_ARRAY: TypeAttributes.Status[] = [
     'warning',
 ]
 
-const Alert = (props: AlertProps) => {
+const Alert = forwardRef<HTMLDivElement, AlertProps>((props, ref) => {
     const {
         children,
         className,
@@ -76,7 +76,6 @@ const Alert = (props: AlertProps) => {
         duration = 3000,
         title = null,
         onClose,
-        ref,
         showIcon = false,
         triggerByToast = false,
         ...rest
@@ -84,21 +83,19 @@ const Alert = (props: AlertProps) => {
 
     const getType = () => {
         const { type = DEFAULT_TYPE } = props
-        if (TYPE_ARRAY.includes(type)) {
-            return type
-        }
+        if (TYPE_ARRAY.includes(type)) return type
         return DEFAULT_TYPE
     }
 
     const type = getType()
     const typeMap = TYPE_MAP[type]
 
-    const [display, setDisplay] = useState('show')
+    const [display, setDisplay] = useState<'show' | 'hiding' | 'hide'>('show')
 
     const { clear } = useTimeout(
         onClose as () => void,
         duration,
-        (duration as number) > 0,
+        duration > 0,
     )
 
     const handleClose = (e: MouseEvent<HTMLDivElement>) => {
@@ -106,9 +103,7 @@ const Alert = (props: AlertProps) => {
         onClose?.(e)
         clear()
         if (!triggerByToast) {
-            setTimeout(() => {
-                setDisplay('hide')
-            }, 400)
+            setTimeout(() => setDisplay('hide'), 400)
         }
     }
 
@@ -137,13 +132,10 @@ const Alert = (props: AlertProps) => {
         closable ? 'justify-between' : '',
         closable && !title ? 'items-center' : '',
         !triggerByToast && 'rounded-xl',
-
         className,
     )
 
-    if (display === 'hide') {
-        return null
-    }
+    if (display === 'hide') return null
 
     return (
         <motion.div
@@ -153,12 +145,8 @@ const Alert = (props: AlertProps) => {
             animate={display === 'hiding' ? 'exit' : 'animate'}
             transition={{ duration: 0.25, type: 'tween' }}
             variants={{
-                animate: {
-                    opacity: 1,
-                },
-                exit: {
-                    opacity: 0,
-                },
+                animate: { opacity: 1 },
+                exit: { opacity: 0 },
             }}
             {...rest}
         >
@@ -176,6 +164,7 @@ const Alert = (props: AlertProps) => {
                         type={type}
                     />
                 )}
+
                 <div>
                     {title ? (
                         <div
@@ -187,12 +176,16 @@ const Alert = (props: AlertProps) => {
                             {title}
                         </div>
                     ) : null}
+
                     {children}
                 </div>
             </div>
+
             {closable ? renderClose() : null}
         </motion.div>
     )
-}
+})
+
+Alert.displayName = 'Alert'
 
 export default Alert

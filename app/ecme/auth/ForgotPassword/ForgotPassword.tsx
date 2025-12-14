@@ -3,19 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-// FIX 1: Adjust paths for UI components (Go up 2 levels to 'components', then into 'ui')
-import Alert from '../../ui/Alert/Alert'
-import Button from '../../ui/Button/Button'
-import ActionLink from '../../shared/ActionLink'
+import Alert from '../../components/ui/Alert'
+import Button from '../../components/ui/Button'
+import ActionLink from '../../components/shared/ActionLink'
+import useTimeOutMessage from '../../utils/hooks/useTimeOutMessage'
 
-// FIX 2: Adjust path for Utils (Go up 3 levels to 'ecme', then into 'utils')
-import useTimeOutMessage from '../../../utils/hooks/useTimeOutMessage'
-
-// Import the form component (Same folder, so ./ is correct)
 import ForgotPasswordFormOriginal from './ForgotPasswordForm'
 import type { OnForgotPasswordSubmit } from './ForgotPasswordForm'
 
-// FIX 3: "as any" trick to prevent the children type error
 const ForgotPasswordForm = ForgotPasswordFormOriginal as any
 
 type ForgotPasswordProps = {
@@ -23,10 +18,10 @@ type ForgotPasswordProps = {
   onForgotPasswordSubmit?: OnForgotPasswordSubmit
 }
 
-export const ForgotPassword = ({
-  signInUrl = '/sign-in',
+export default function ForgotPassword({
+  signInUrl = '/ecme/auth/SignIn',
   onForgotPasswordSubmit,
-}: ForgotPasswordProps) => {
+}: ForgotPasswordProps) {
   const [emailSent, setEmailSent] = useState(false)
   const [message, setMessage] = useTimeOutMessage()
   const router = useRouter()
@@ -55,11 +50,11 @@ export const ForgotPassword = ({
         )}
       </div>
 
-      {message && (
+      {message ? (
         <Alert showIcon className="mb-4" type="danger">
           <span className="break-all">{message}</span>
         </Alert>
-      )}
+      ) : null}
 
       <ForgotPasswordForm
         emailSent={emailSent}
@@ -85,5 +80,3 @@ export const ForgotPassword = ({
     </div>
   )
 }
-
-export default ForgotPassword

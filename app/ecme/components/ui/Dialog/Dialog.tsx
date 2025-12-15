@@ -1,12 +1,15 @@
+'use client'
+
 import Modal from 'react-modal'
 import classNames from 'classnames'
 import CloseButton from '../CloseButton'
 import { motion } from 'framer-motion'
 import useWindowSize from '../hooks/useWindowSize'
-import type ReactModal from 'react-modal'
-import type { MouseEvent } from 'react'
+import type { Props as ReactModalProps } from 'react-modal'
+import type { MouseEvent, ReactNode } from 'react'
 
-export interface DialogProps extends ReactModal.Props {
+export interface DialogProps extends ReactModalProps {
+    children?: ReactNode
     closable?: boolean
     contentClassName?: string
     height?: string | number
@@ -46,7 +49,7 @@ const Dialog = (props: DialogProps) => {
         />
     )
 
-    const contentStyle = {
+    const contentStyle: any = {
         content: {
             inset: 'unset',
         },
@@ -56,10 +59,7 @@ const Dialog = (props: DialogProps) => {
     if (width !== undefined) {
         contentStyle.content.width = width
 
-        if (
-            typeof currentSize.width !== 'undefined' &&
-            currentSize.width <= width
-        ) {
+        if (typeof currentSize.width !== 'undefined' && currentSize.width <= width) {
             contentStyle.content.width = 'auto'
         }
     }
@@ -69,7 +69,6 @@ const Dialog = (props: DialogProps) => {
     }
 
     const defaultDialogContentClass = 'dialog-content'
-
     const dialogClass = classNames(defaultDialogContentClass, contentClassName)
 
     return (

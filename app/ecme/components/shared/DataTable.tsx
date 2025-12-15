@@ -94,12 +94,13 @@ const IndeterminateCheckbox = (props: IndeterminateCheckboxProps) => {
     }
 
     return (
-        <Checkbox
-            ref={ref}
-            className="mb-0"
-            onChange={(_, e) => handleChange(e)}
-            {...rest}
-        />
+        <div className="mb-0">
+            <Checkbox
+                ref={ref}
+                onChange={(_, e) => handleChange(e)}
+                {...rest}
+            />
+        </div>
     )
 }
 
@@ -311,6 +312,7 @@ function DataTable<T>(props: DataTableProps<T>) {
                         </Tr>
                     ))}
                 </THead>
+
                 {loading && data.length === 0 ? (
                     <TableRowSkeleton
                         columns={(finalColumns as Array<T>).length}
@@ -373,6 +375,7 @@ function DataTable<T>(props: DataTableProps<T>) {
                     </TBody>
                 )}
             </Table>
+
             <div className="flex items-center justify-between mt-4">
                 <Pagination
                     pageSize={pageSize}
@@ -380,6 +383,7 @@ function DataTable<T>(props: DataTableProps<T>) {
                     total={total}
                     onChange={handlePaginationChange}
                 />
+
                 <div style={{ minWidth: 130 }}>
                     <Select
                         instanceId={instanceId}
@@ -390,7 +394,9 @@ function DataTable<T>(props: DataTableProps<T>) {
                             (option) => option.value === pageSize,
                         )}
                         options={pageSizeOption}
-                        onChange={(option) => handleSelectChange(option?.value)}
+                        onChange={(option: { value?: number } | null) =>
+                            handleSelectChange(option?.value)
+                        }
                     />
                 </div>
             </div>

@@ -1,11 +1,12 @@
+'use client'
+
 import { useState, useEffect, useRef } from 'react'
 import classNames from 'classnames'
 import { useConfig } from '../ConfigProvider'
 import { useForm, useFormItem } from '../Form/context'
 import { useInputGroup } from '../InputGroup/context'
-import { CONTROL_SIZES } from '../utils/constants'
-import isNil from 'lodash/isNil'
-import type { CommonProps, TypeAttributes } from '../@types/common'
+import { CONTROL_SIZES } from '../../../utils/constants'
+import type { CommonProps, TypeAttributes } from '../../../@types/common'
 import type {
     InputHTMLAttributes,
     ElementType,
@@ -14,6 +15,9 @@ import type {
     ClassAttributes,
     Ref,
 } from 'react'
+
+const isNil = (val: unknown): val is null | undefined =>
+    val === null || typeof val === 'undefined'
 
 export interface InputProps
     extends CommonProps,
@@ -61,7 +65,6 @@ const Input = (props: InputProps) => {
     const inputGroupSize = useInputGroup()?.size
 
     const inputSize = size || inputGroupSize || formControlSize || controlSize
-
     const isInputInvalid = invalid || formItemInvalid
 
     const fixControlledValue = (
@@ -74,17 +77,20 @@ const Input = (props: InputProps) => {
     }
 
     if ('value' in props) {
-        rest.value = fixControlledValue(props.value)
-        delete rest.defaultValue
+        ;(rest as any).value = fixControlledValue((props as any).value)
+        delete (rest as any).defaultValue
     }
 
     const inputDefaultClass = 'input'
     const inputSizeClass = `input-${inputSize} ${CONTROL_SIZES[inputSize].h}`
-    const inputFocusClass = `focus:ring-primary focus-within:ring-primary focus-within:border-primary focus:border-primary`
+    const inputFocusClass =
+        'focus:ring-primary focus-within:ring-primary focus-within:border-primary focus:border-primary'
+
     const inputWrapperClass = classNames(
         'input-wrapper',
         prefix || suffix ? className : '',
     )
+
     const inputClass = classNames(
         inputDefaultClass,
         inputSizeClass,
@@ -99,23 +105,15 @@ const Input = (props: InputProps) => {
     const suffixNode = useRef<HTMLDivElement>(null)
 
     const getAffixSize = () => {
-        if (!prefixNode.current && !suffixNode.current) {
-            return
-        }
-        const prefixNodeWidth = prefixNode?.current?.offsetWidth
-        const suffixNodeWidth = suffixNode?.current?.offsetWidth
+        if (!prefixNode.current && !suffixNode.current) return
 
-        if (isNil(prefixNodeWidth) && isNil(suffixNodeWidth)) {
-            return
-        }
+        const prefixNodeWidth = prefixNode.current?.offsetWidth
+        const suffixNodeWidth = suffixNode.current?.offsetWidth
 
-        if (prefixNodeWidth) {
-            setPrefixGutter(prefixNodeWidth)
-        }
+        if (isNil(prefixNodeWidth) && isNil(suffixNodeWidth)) return
 
-        if (suffixNodeWidth) {
-            setSuffixGutter(suffixNodeWidth)
-        }
+        if (prefixNodeWidth) setPrefixGutter(prefixNodeWidth)
+        if (suffixNodeWidth) setSuffixGutter(suffixNodeWidth)
     }
 
     useEffect(() => {
@@ -127,29 +125,20 @@ const Input = (props: InputProps) => {
     const affixGutterStyle = () => {
         const leftGutter = `${remToPxConvertion(prefixGutter) + 1}rem`
         const rightGutter = `${remToPxConvertion(suffixGutter) + 1}rem`
+
         const gutterStyle: {
             paddingLeft?: string
             paddingRight?: string
         } = {}
 
         if (direction === 'ltr') {
-            if (prefix) {
-                gutterStyle.paddingLeft = leftGutter
-            }
-
-            if (suffix) {
-                gutterStyle.paddingRight = rightGutter
-            }
+            if (prefix) gutterStyle.paddingLeft = leftGutter
+            if (suffix) gutterStyle.paddingRight = rightGutter
         }
 
         if (direction === 'rtl') {
-            if (prefix) {
-                gutterStyle.paddingRight = leftGutter
-            }
-
-            if (suffix) {
-                gutterStyle.paddingLeft = rightGutter
-            }
+            if (prefix) gutterStyle.paddingRight = leftGutter
+            if (suffix) gutterStyle.paddingLeft = rightGutter
         }
 
         return gutterStyle
@@ -168,13 +157,13 @@ const Input = (props: InputProps) => {
             style={style}
             rows={rows}
             {...(inputProps as ClassAttributes<HTMLTextAreaElement>)}
-        ></textarea>
+        />
     )
 
     const renderInput = (
         <Component
             style={{ ...affixGutterStyle(), ...style }}
-            {...inputProps}
+            {...(inputProps as any)}
         />
     )
 
@@ -182,11 +171,12 @@ const Input = (props: InputProps) => {
         <span className={inputWrapperClass}>
             {prefix ? (
                 <div ref={prefixNode} className="input-suffix-start">
-                    {' '}
-                    {prefix}{' '}
+                    {prefix}
                 </div>
             ) : null}
+
             {renderInput}
+
             {suffix ? (
                 <div ref={suffixNode} className="input-suffix-end">
                     {suffix}
@@ -195,19 +185,9 @@ const Input = (props: InputProps) => {
         </span>
     )
 
-    const renderChildren = () => {
-        if (textArea) {
-            return renderTextArea
-        }
-
-        if (prefix || suffix) {
-            return renderAffixInput
-        } else {
-            return renderInput
-        }
-    }
-
-    return renderChildren()
+    if (textArea) return renderTextArea
+    if (prefix || suffix) return renderAffixInput
+    return renderInput
 }
 
 export default Input

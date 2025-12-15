@@ -24,6 +24,7 @@
     "@tiptap/react": "^3.13.0",
     "@tiptap/starter-kit": "^3.13.0",
     "@types/lodash": "^4.17.21",
+    "@visx/pattern": "^3.12.0",
     "ai": "^5.0.102",
     "apexcharts": "^5.3.6",
     "classnames": "^2.5.1",
@@ -50,7 +51,7 @@
   "devDependencies": {
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.4",
-    "@types/react": "^19",
+    "@types/react": "^19.2.7",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.22",
     "baseline-browser-mapping": "^2.9.7",

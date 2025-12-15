@@ -10,7 +10,7 @@ interface DoubleSidedImageProps
     darkModeSrc: string
 }
 
-const { MODE_DARK } = THEME_ENUM
+const MODE_DARK = THEME_ENUM.DARK
 
 const DoubleSidedImage = ({
     src,

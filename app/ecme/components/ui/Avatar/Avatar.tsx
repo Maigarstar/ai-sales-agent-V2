@@ -1,10 +1,15 @@
+'use client'
+
 import { useState, useEffect, useRef } from 'react'
 import useMergedRef from '../hooks/useMergeRef'
 import classNames from 'classnames'
-import type { CommonProps, TypeAttributes } from '../@types/common'
-import type { ReactNode, Ref } from 'react'
+import type { CommonProps, TypeAttributes } from '../types/common'
+import type { ReactNode, Ref, CSSProperties } from 'react'
 
 export interface AvatarProps extends CommonProps {
+    children?: ReactNode
+    style?: CSSProperties
+
     alt?: string
     icon?: ReactNode
     onClick?: () => void
@@ -25,10 +30,13 @@ const Avatar = (props: AvatarProps) => {
         size = 'md',
         src,
         srcSet,
+        style,
+        children: childrenProp,
         ...rest
     } = props
 
-    let { children } = props
+    let children = childrenProp
+
     const [scale, setScale] = useState(1)
 
     const avatarChildren = useRef<HTMLSpanElement>(null)
@@ -37,14 +45,13 @@ const Avatar = (props: AvatarProps) => {
     const avatarMergeRef = useMergedRef(ref, avatarNode)
 
     const innerScale = () => {
-        if (!avatarChildren.current || !avatarNode.current) {
-            return
-        }
+        if (!avatarChildren.current || !avatarNode.current) return
+
         const avatarChildrenWidth = avatarChildren.current.offsetWidth
         const avatarNodeWidth = avatarNode.current.offsetWidth
-        if (avatarChildrenWidth === 0 || avatarNodeWidth === 0) {
-            return
-        }
+
+        if (avatarChildrenWidth === 0 || avatarNodeWidth === 0) return
+
         setScale(
             avatarNodeWidth - 8 < avatarChildrenWidth
                 ? (avatarNodeWidth - 8) / avatarChildrenWidth
@@ -54,7 +61,8 @@ const Avatar = (props: AvatarProps) => {
 
     useEffect(() => {
         innerScale()
-    }, [scale, children])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scale, childrenProp])
 
     const sizeStyle =
         typeof size === 'number'
@@ -93,9 +101,11 @@ const Avatar = (props: AvatarProps) => {
     } else {
         const childrenSizeStyle =
             typeof size === 'number' ? { lineHeight: `${size}px` } : {}
+
         const stringCentralized = {
             transform: `translateX(-50%) scale(${scale})`,
         }
+
         children = (
             <span
                 ref={avatarChildren}
@@ -117,7 +127,7 @@ const Avatar = (props: AvatarProps) => {
         <span
             ref={avatarMergeRef}
             className={classes}
-            style={{ ...sizeStyle, ...rest.style }}
+            style={{ ...sizeStyle, ...(style || {}) }}
             {...rest}
         >
             {children}

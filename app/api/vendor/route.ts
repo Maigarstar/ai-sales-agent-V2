@@ -3,17 +3,20 @@ import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
 }
 
+type LeadType = 'Hot' | 'Warm' | 'Cold'
+
 type AIResponseShape = {
   reply: string
   metadata: {
     score: number
-    lead_type: 'Hot' | 'Warm' | 'Cold'
+    lead_type: LeadType
     business_category: string | null
     location: string | null
     client_budget: string | null
@@ -21,14 +24,22 @@ type AIResponseShape = {
   } | null
 }
 
+function jsonOk(payload: any) {
+  return NextResponse.json(payload, { status: 200 })
+}
+
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.OPENAI_API_KEY || ''
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+
+    const supabaseUrl =
+      process.env.SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      ''
 
     const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE ||
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       ''
 
@@ -42,14 +53,11 @@ export async function POST(req: Request) {
     const messages = (body?.messages ?? []) as ChatMessage[]
 
     if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        {
-          reply:
-            'Tell me a little about your wedding business, venue or brand so I can guide you.',
-          metadata: null,
-        },
-        { status: 200 },
-      )
+      return jsonOk({
+        reply:
+          'Tell me a little about your wedding business, venue or brand so I can guide you.',
+        metadata: null,
+      })
     }
 
     const lastUser = [...messages].reverse().find((m) => m?.role === 'user')
@@ -112,12 +120,9 @@ Return valid JSON in this exact shape only:
         auth: { persistSession: false },
       })
 
-      const rows: any[] = []
+      const rows: Array<{ role: string; content: string }> = []
 
-      if (lastUser?.content) {
-        rows.push({ role: 'user', content: lastUser.content })
-      }
-
+      if (lastUser?.content) rows.push({ role: 'user', content: lastUser.content })
       rows.push({ role: 'assistant', content: replyText })
 
       const { error: chatError } = await supabase
@@ -131,8 +136,6 @@ Return valid JSON in this exact shape only:
       if (metadata) {
         const leadType = metadata.lead_type ?? null
         const score = typeof metadata.score === 'number' ? metadata.score : null
-        const businessCategory = metadata.business_category ?? null
-        const location = metadata.location ?? null
 
         const shouldSave = leadType === 'Warm' || leadType === 'Hot'
 
@@ -141,8 +144,8 @@ Return valid JSON in this exact shape only:
             {
               lead_type: leadType,
               score,
-              business_category: businessCategory,
-              location,
+              business_category: metadata.business_category ?? null,
+              location: metadata.location ?? null,
             },
           ])
 
@@ -153,18 +156,13 @@ Return valid JSON in this exact shape only:
       }
     }
 
-    return NextResponse.json({ reply: replyText, metadata }, { status: 200 })
+    return jsonOk({ reply: replyText, metadata })
   } catch (err: any) {
     console.error('VENDORS CHAT API ERROR:', err)
 
-    const devMessage = `Developer error, ${err?.message || 'unknown error'}. Check the server console.`
-
-    return NextResponse.json(
-      {
-        reply: devMessage,
-        metadata: null,
-      },
-      { status: 200 },
-    )
+    return jsonOk({
+      reply: `Developer error, ${err?.message || 'unknown error'}. Check the server console.`,
+      metadata: null,
+    })
   }
 }

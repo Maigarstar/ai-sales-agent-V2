@@ -1,25 +1,38 @@
-import { useContext, useCallback, useState } from 'react'
+'use client'
+
+import { useContext, useCallback, useState, forwardRef } from 'react'
 import classNames from 'classnames'
 import CheckboxGroupContext from './context'
-import type { CommonProps } from '../@types/common'
 import type { CheckboxValue } from './context'
-import type { ChangeEvent, Ref } from 'react'
+import type {
+    ChangeEvent,
+    CSSProperties,
+    InputHTMLAttributes,
+    ReactNode,
+    Ref,
+} from 'react'
 
-export interface CheckboxProps extends CommonProps {
+export interface CheckboxProps
+    extends Omit<
+        InputHTMLAttributes<HTMLInputElement>,
+        'type' | 'onChange' | 'children'
+    > {
+    className?: string
+    style?: CSSProperties
+    children?: ReactNode
+
     checked?: boolean
     checkboxClass?: string
     defaultChecked?: boolean
     disabled?: boolean
     indeterminate?: boolean
     labelRef?: Ref<HTMLLabelElement>
-    name?: string
     onChange?: (values: boolean, e: ChangeEvent<HTMLInputElement>) => void
     readOnly?: boolean
-    ref?: Ref<HTMLInputElement>
     value?: CheckboxValue
 }
 
-const Checkbox = (props: CheckboxProps) => {
+const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>((props, inputRef) => {
     const {
         name: nameContext,
         value: groupValue,
@@ -30,6 +43,7 @@ const Checkbox = (props: CheckboxProps) => {
     const {
         checked: controlledChecked,
         className,
+        style,
         checkboxClass,
         onChange,
         children,
@@ -40,7 +54,6 @@ const Checkbox = (props: CheckboxProps) => {
         defaultChecked,
         value,
         labelRef,
-        ref,
         ...rest
     } = props
 
@@ -48,7 +61,7 @@ const Checkbox = (props: CheckboxProps) => {
         if (typeof groupValue !== 'undefined' && typeof value !== 'undefined') {
             return groupValue.some((i) => i === value)
         }
-        return controlledChecked || defaultChecked
+        return Boolean(controlledChecked ?? defaultChecked)
     }, [controlledChecked, groupValue, value, defaultChecked])
 
     const [checkboxChecked, setCheckboxChecked] = useState(isChecked())
@@ -57,10 +70,7 @@ const Checkbox = (props: CheckboxProps) => {
         const checkedValue = checkboxChecked
 
         let groupChecked = { checked: checkedValue }
-        const singleChecked: {
-            defaultChecked?: boolean
-            checked?: boolean
-        } = {}
+        const singleChecked: { defaultChecked?: boolean; checked?: boolean } = {}
 
         if (typeof controlledChecked !== 'undefined') {
             singleChecked.checked = controlledChecked
@@ -73,6 +83,7 @@ const Checkbox = (props: CheckboxProps) => {
         if (defaultChecked) {
             singleChecked.defaultChecked = defaultChecked
         }
+
         return typeof groupValue !== 'undefined' ? groupChecked : singleChecked
     }
 
@@ -86,9 +97,7 @@ const Checkbox = (props: CheckboxProps) => {
                 nextChecked = !groupValue.includes(value as never)
             }
 
-            if (disabled || readOnly) {
-                return
-            }
+            if (disabled || readOnly) return
 
             setCheckboxChecked(nextChecked)
             onChange?.(nextChecked, e)
@@ -98,7 +107,6 @@ const Checkbox = (props: CheckboxProps) => {
             checkboxChecked,
             disabled,
             readOnly,
-            setCheckboxChecked,
             onChange,
             value,
             onGroupChange,
@@ -106,29 +114,21 @@ const Checkbox = (props: CheckboxProps) => {
         ],
     )
 
-    const checkboxColor =
-        checkboxClass || checkboxClassContext || `text-primary`
+    const checkboxColor = checkboxClass || checkboxClassContext || 'text-primary'
 
     const checkboxDefaultClass = `checkbox peer ${checkboxColor}`
     const checkboxColorClass = disabled && 'disabled'
-    const labelDefaultClass = `checkbox-label`
+    const labelDefaultClass = 'checkbox-label'
     const labelDisabledClass = disabled && 'disabled'
 
-    const labelClass = classNames(
-        labelDefaultClass,
-        labelDisabledClass,
-        className,
-    )
+    const labelClass = classNames(labelDefaultClass, labelDisabledClass, className)
 
     return (
-        <label ref={labelRef} className={labelClass}>
+        <label ref={labelRef} className={labelClass} style={style}>
             <span className="checkbox-wrapper relative">
                 <input
-                    ref={ref}
-                    className={classNames(
-                        checkboxDefaultClass,
-                        checkboxColorClass,
-                    )}
+                    ref={inputRef}
+                    className={classNames(checkboxDefaultClass, checkboxColorClass)}
                     type="checkbox"
                     disabled={disabled}
                     readOnly={readOnly}
@@ -137,28 +137,28 @@ const Checkbox = (props: CheckboxProps) => {
                     {...controlProps}
                     {...rest}
                 />
-                <>
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-3.5 w-3.5 stroke-neutral fill-neutral opacity-0 transition-opacity peer-checked:opacity-100 pointer-events-none absolute top-2/4 left-2/4 -translate-y-2/4 -translate-x-2/4 mt-[1.25px]"
-                        viewBox="0 0 20 20"
-                    >
-                        {indeterminate ? (
-                            <path
-                                fillRule="evenodd"
-                                d="M5 10a1 1 0 0 1 1-1h8a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"
-                                clipRule="evenodd"
-                            />
-                        ) : (
-                            <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0z"
-                                clipRule="evenodd"
-                            />
-                        )}
-                    </svg>
-                </>
+
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-3.5 w-3.5 stroke-neutral fill-neutral opacity-0 transition-opacity peer-checked:opacity-100 pointer-events-none absolute top-2/4 left-2/4 -translate-y-2/4 -translate-x-2/4 mt-[1.25px]"
+                    viewBox="0 0 20 20"
+                >
+                    {indeterminate ? (
+                        <path
+                            fillRule="evenodd"
+                            d="M5 10a1 1 0 0 1 1-1h8a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"
+                            clipRule="evenodd"
+                        />
+                    ) : (
+                        <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 0 1 0 1.414l-8 8a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L8 12.586l7.293-7.293a1 1 0 0 1 1.414 0z"
+                            clipRule="evenodd"
+                        />
+                    )}
+                </svg>
             </span>
+
             {children ? (
                 <span className={classNames(disabled ? 'opacity-50' : '')}>
                     {children}
@@ -166,6 +166,8 @@ const Checkbox = (props: CheckboxProps) => {
             ) : null}
         </label>
     )
-}
+})
+
+Checkbox.displayName = 'Checkbox'
 
 export default Checkbox

@@ -1,3 +1,5 @@
+'use client'
+
 import {
     useMemo,
     useRef,
@@ -31,6 +33,11 @@ import type { Ref, ChangeEvent, ReactNode } from 'react'
 import type { CheckboxProps } from '@/components/ui/Checkbox'
 
 export type OnSortParam = { order: 'asc' | 'desc' | ''; key: string | number }
+
+type PageSizeOption = {
+    value: number
+    label: string
+}
 
 type DataTableProps<T> = {
     columns: ColumnDef<T>[]
@@ -84,8 +91,7 @@ const IndeterminateCheckbox = (props: IndeterminateCheckboxProps) => {
         if (typeof indeterminate === 'boolean' && ref.current) {
             ref.current.indeterminate = !rest.checked && indeterminate
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ref, indeterminate])
+    }, [indeterminate, rest.checked])
 
     const handleChange = (e: CheckBoxChangeEvent) => {
         onChange(e)
@@ -96,7 +102,6 @@ const IndeterminateCheckbox = (props: IndeterminateCheckboxProps) => {
     return (
         <Checkbox
             ref={ref}
-            className="mb-0"
             onChange={(_, e) => handleChange(e)}
             {...rest}
         />
@@ -140,7 +145,7 @@ function DataTable<T>(props: DataTableProps<T>) {
 
     const [sorting, setSorting] = useState<ColumnSort[] | null>(null)
 
-    const pageSizeOption = useMemo(
+    const pageSizeOption: PageSizeOption[] = useMemo(
         () =>
             pageSizes.map((number) => ({
                 value: number,
@@ -156,13 +161,9 @@ function DataTable<T>(props: DataTableProps<T>) {
             const id = sorting.length > 0 ? sorting[0].id : ''
             onSort?.({ order: sortOrder, key: id })
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sorting])
+    }, [sorting, onSort])
 
-    const handleIndeterminateCheckBoxChange = (
-        checked: boolean,
-        rows: Row<T>[],
-    ) => {
+    const handleIndeterminateCheckBoxChange = (checked: boolean, rows: Row<T>[]) => {
         if (!loading) {
             onIndeterminateCheckBoxChange?.(checked, rows)
         }
@@ -186,9 +187,7 @@ function DataTable<T>(props: DataTableProps<T>) {
                         <IndeterminateCheckbox
                             checked={
                                 indeterminateCheckboxChecked
-                                    ? indeterminateCheckboxChecked(
-                                          table.getRowModel().rows,
-                                      )
+                                    ? indeterminateCheckboxChecked(table.getRowModel().rows)
                                     : table.getIsAllRowsSelected()
                             }
                             indeterminate={table.getIsSomeRowsSelected()}
@@ -212,10 +211,7 @@ function DataTable<T>(props: DataTableProps<T>) {
                             indeterminate={row.getIsSomeSelected()}
                             onChange={row.getToggleSelectedHandler()}
                             onCheckBoxChange={(e) =>
-                                handleCheckBoxChange(
-                                    e.target.checked,
-                                    row.original,
-                                )
+                                handleCheckBoxChange(e.target.checked, row.original)
                             }
                         />
                     ),
@@ -223,9 +219,15 @@ function DataTable<T>(props: DataTableProps<T>) {
                 ...columns,
             ]
         }
+
         return columns
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [columnsProp, selectable, loading, checkboxChecked])
+    }, [
+        columnsProp,
+        selectable,
+        loading,
+        checkboxChecked,
+        indeterminateCheckboxChecked,
+    ])
 
     const table = useReactTable({
         data,
@@ -241,7 +243,7 @@ function DataTable<T>(props: DataTableProps<T>) {
             setSorting(sorter as ColumnSort[])
         },
         state: {
-            sorting: sorting as ColumnSort[],
+            sorting: (sorting as ColumnSort[]) || [],
         },
     })
 
@@ -279,29 +281,22 @@ function DataTable<T>(props: DataTableProps<T>) {
                         <Tr key={headerGroup.id}>
                             {headerGroup.headers.map((header) => {
                                 return (
-                                    <Th
-                                        key={header.id}
-                                        colSpan={header.colSpan}
-                                    >
+                                    <Th key={header.id} colSpan={header.colSpan}>
                                         {header.isPlaceholder ? null : (
                                             <div
                                                 className={classNames(
                                                     header.column.getCanSort() &&
                                                         'cursor-pointer select-none point',
-                                                    loading &&
-                                                        'pointer-events-none',
+                                                    loading && 'pointer-events-none',
                                                 )}
                                                 onClick={header.column.getToggleSortingHandler()}
                                             >
                                                 {flexRender(
-                                                    header.column.columnDef
-                                                        .header,
+                                                    header.column.columnDef.header,
                                                     header.getContext(),
                                                 )}
                                                 {header.column.getCanSort() && (
-                                                    <Sorter
-                                                        sort={header.column.getIsSorted()}
-                                                    />
+                                                    <Sorter sort={header.column.getIsSorted()} />
                                                 )}
                                             </div>
                                         )}
@@ -311,6 +306,7 @@ function DataTable<T>(props: DataTableProps<T>) {
                         </Tr>
                     ))}
                 </THead>
+
                 {loading && data.length === 0 ? (
                     <TableRowSkeleton
                         columns={(finalColumns as Array<T>).length}
@@ -322,19 +318,14 @@ function DataTable<T>(props: DataTableProps<T>) {
                     <TBody>
                         {noData ? (
                             <Tr>
-                                <Td
-                                    className="hover:bg-transparent"
-                                    colSpan={finalColumns.length}
-                                >
+                                <Td className="hover:bg-transparent" colSpan={finalColumns.length}>
                                     <div className="flex flex-col items-center gap-4">
                                         {customNoDataIcon ? (
                                             customNoDataIcon
                                         ) : (
                                             <>
                                                 <FileNotFound />
-                                                <span className="font-semibold">
-                                                    No data found!
-                                                </span>
+                                                <span className="font-semibold">No data found!</span>
                                             </>
                                         )}
                                     </div>
@@ -347,25 +338,19 @@ function DataTable<T>(props: DataTableProps<T>) {
                                 .map((row) => {
                                     return (
                                         <Tr key={row.id}>
-                                            {row
-                                                .getVisibleCells()
-                                                .map((cell) => {
-                                                    return (
-                                                        <Td
-                                                            key={cell.id}
-                                                            style={{
-                                                                width: cell.column.getSize(),
-                                                            }}
-                                                        >
-                                                            {flexRender(
-                                                                cell.column
-                                                                    .columnDef
-                                                                    .cell,
-                                                                cell.getContext(),
-                                                            )}
-                                                        </Td>
-                                                    )
-                                                })}
+                                            {row.getVisibleCells().map((cell) => {
+                                                return (
+                                                    <Td
+                                                        key={cell.id}
+                                                        style={{ width: cell.column.getSize() }}
+                                                    >
+                                                        {flexRender(
+                                                            cell.column.columnDef.cell,
+                                                            cell.getContext(),
+                                                        )}
+                                                    </Td>
+                                                )
+                                            })}
                                         </Tr>
                                     )
                                 })
@@ -373,6 +358,7 @@ function DataTable<T>(props: DataTableProps<T>) {
                     </TBody>
                 )}
             </Table>
+
             <div className="flex items-center justify-between mt-4">
                 <Pagination
                     pageSize={pageSize}
@@ -380,17 +366,18 @@ function DataTable<T>(props: DataTableProps<T>) {
                     total={total}
                     onChange={handlePaginationChange}
                 />
+
                 <div style={{ minWidth: 130 }}>
                     <Select
                         instanceId={instanceId}
                         size="sm"
                         menuPlacement="top"
                         isSearchable={false}
-                        value={pageSizeOption.filter(
-                            (option) => option.value === pageSize,
-                        )}
+                        value={pageSizeOption.filter((option) => option.value === pageSize)}
                         options={pageSizeOption}
-                        onChange={(option) => handleSelectChange(option?.value)}
+                        onChange={(option: PageSizeOption | null) =>
+                            handleSelectChange(option?.value)
+                        }
                     />
                 </div>
             </div>

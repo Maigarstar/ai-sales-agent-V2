@@ -33,3 +33,13 @@ export const LAYOUT_CONTENT_OVERLAY = 'contentOverlay' as const
 
 // Theme package sometimes references frameless, map it to framed so imports compile
 export const LAYOUT_FRAMELESS_SIDE = LAYOUT_FRAMED_SIDE
+
+// app/ecme/constants/theme.constant.ts
+export * from '../../constants/theme.constant'
+
+
+// app/constants/theme.constant.ts
+export * from '../ecme/constants/theme.constant'
+
+// app/ecme/constants/theme.constant.ts
+export * from '../../constants/theme.constant'

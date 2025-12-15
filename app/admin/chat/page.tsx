@@ -23,12 +23,18 @@ function CardShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PillLink({ href, children }: { href: string; children: React.ReactNode }) {
+function PillLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
   return (
     <Link
       href={href}
       style={{
-        display: "inlineBlock" as any,
+        display: "inline-block",
         padding: "8px 16px",
         borderRadius: 999,
         backgroundColor: "#183F34",
@@ -55,7 +61,14 @@ function ConciergeCard({
 }) {
   return (
     <CardShell>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "spaceBetween", minHeight: 170 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          minHeight: 170,
+        }}
+      >
         <div>
           <h2
             style={{
@@ -68,7 +81,9 @@ function ConciergeCard({
           >
             {title}
           </h2>
-          <p style={{ marginTop: 8, marginBottom: 16, fontSize: 14, color: "#555" }}>{body}</p>
+          <p style={{ marginTop: 8, marginBottom: 16, fontSize: 14, color: "#555" }}>
+            {body}
+          </p>
         </div>
         <div>
           <PillLink href={href}>{button}</PillLink>
@@ -82,7 +97,15 @@ function StatCard({ title, value, delta }: Stat) {
   return (
     <CardShell>
       <div style={{ fontSize: 13, color: "#666" }}>{title}</div>
-      <div style={{ marginTop: 10, fontSize: 34, fontWeight: 700, color: "#111", letterSpacing: -0.4 }}>
+      <div
+        style={{
+          marginTop: 10,
+          fontSize: 34,
+          fontWeight: 700,
+          color: "#111",
+          letterSpacing: -0.4,
+        }}
+      >
         {value}
       </div>
       <div style={{ marginTop: 6, fontSize: 13, color: "#1f7a4d" }}>{delta}</div>
@@ -120,7 +143,11 @@ function Panel({
       >
         {title}
       </h3>
-      {subtitle ? <p style={{ margin: "10px 0 0 0", fontSize: 14, color: "#666" }}>{subtitle}</p> : null}
+      {subtitle ? (
+        <p style={{ margin: "10px 0 0 0", fontSize: 14, color: "#666" }}>
+          {subtitle}
+        </p>
+      ) : null}
       <div style={{ marginTop: 18 }}>{children}</div>
     </section>
   );
@@ -141,13 +168,20 @@ export default function AdminChatHubPage() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#f7f4ef", boxSizing: "borderBox" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#f7f4ef",
+        boxSizing: "border-box",
+      }}
+    >
       <div
         style={{
           maxWidth: 1100,
           margin: "0 auto",
           padding: 32,
-          fontFamily: '"Nunito Sans",system-ui,AppleSystem,"Segoe UI",sans-serif',
+          fontFamily:
+            '"Nunito Sans",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
         }}
       >
         <AdminNav />
@@ -257,7 +291,7 @@ export default function AdminChatHubPage() {
           <Panel title="Recent Vendor Activity">
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {activity.map((a) => (
-                <div key={a.name} style={{ display: "flex", justifyContent: "spaceBetween", gap: 16 }}>
+                <div key={a.name} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
                   <div>
                     <div style={{ fontWeight: 700, color: "#111" }}>{a.name}</div>
                     <div style={{ marginTop: 4, color: "#666", fontSize: 13 }}>{a.note}</div>

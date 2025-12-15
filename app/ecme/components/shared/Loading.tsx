@@ -1,3 +1,5 @@
+'use client'
+
 import Spinner from '@/components/ui/Spinner'
 import classNames from 'classnames'
 import type { CommonProps } from '@/@types/common'
@@ -34,7 +36,9 @@ const DefaultLoading = (props: BaseLoadingProps) => {
             {customLoader ? (
                 <>{customLoader}</>
             ) : (
-                <Spinner className={spinnerClass} size={40} />
+                <div className={classNames(spinnerClass)}>
+                    <Spinner size={40} />
+                </div>
             )}
         </Component>
     ) : (
@@ -63,7 +67,9 @@ const CoveredLoading = (props: BaseLoadingProps) => {
                     {customLoader ? (
                         <>{customLoader}</>
                     ) : (
-                        <Spinner className={spinnerClass} size={40} />
+                        <div className={classNames(spinnerClass)}>
+                            <Spinner size={40} />
+                        </div>
                     )}
                 </div>
             )}

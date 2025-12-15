@@ -5,8 +5,8 @@ import classNames from 'classnames'
 import { useConfig } from '../ConfigProvider'
 import { useForm, useFormItem } from '../Form/context'
 import { useInputGroup } from '../InputGroup/context'
-import { CONTROL_SIZES } from '../../../utils/constants'
-import type { CommonProps, TypeAttributes } from '../../../@types/common'
+import { CONTROL_SIZES } from '../utils/constants'
+import type { CommonProps, TypeAttributes } from '../@types/common'
 import type {
     InputHTMLAttributes,
     ElementType,
@@ -70,15 +70,15 @@ const Input = (props: InputProps) => {
     const fixControlledValue = (
         val: string | number | readonly string[] | undefined,
     ) => {
-        if (typeof val === 'undefined' || val === null) {
-            return ''
-        }
+        if (typeof val === 'undefined' || val === null) return ''
         return val
     }
 
     if ('value' in props) {
-        ;(rest as any).value = fixControlledValue((props as any).value)
-        delete (rest as any).defaultValue
+        ;(rest as unknown as { value?: unknown }).value = fixControlledValue(
+            (props as unknown as { value?: any }).value,
+        )
+        delete (rest as unknown as { defaultValue?: unknown }).defaultValue
     }
 
     const inputDefaultClass = 'input'
@@ -118,6 +118,7 @@ const Input = (props: InputProps) => {
 
     useEffect(() => {
         getAffixSize()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prefix, suffix])
 
     const remToPxConvertion = (pixel: number) => 0.0625 * pixel

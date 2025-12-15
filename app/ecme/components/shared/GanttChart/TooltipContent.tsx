@@ -16,16 +16,17 @@ const progressBarStatusClass = (progression: number) => {
         return 'bg-error'
     }
 
-    return
+    return undefined
 }
 
 const TooltipContent = (props: TooltipContentProps) => {
     const { task } = props
 
     return (
-        <div className="p-3 rounded-lg shadow-sm bg-gray-800 dark:bg-black  flex justify-between items-center min-w-[200px] z-10">
+        <div className="p-3 rounded-lg shadow-sm bg-gray-800 dark:bg-black flex justify-between items-center min-w-[200px] z-10">
             <div className="flex flex-col w-full">
                 <div className="text-white font-bold mb-1">{task.name}</div>
+
                 <div className="flex items-center gap-1 text-gray-300">
                     <TbClock className="text-lg" />
                     <span>
@@ -33,13 +34,11 @@ const TooltipContent = (props: TooltipContentProps) => {
                         {dayjs(task.end).format('DD MMM')}
                     </span>
                 </div>
+
                 <div>
-                    {!!task.progress && (
+                    {typeof task.progress === 'number' ? (
                         <Progress
-                            customColorClass={progressBarStatusClass(
-                                task.progress,
-                            )}
-                            className="text-white"
+                            customColorClass={progressBarStatusClass(task.progress)}
                             percent={task.progress}
                             trailClass="bg-gray-500"
                             customInfo={
@@ -48,7 +47,7 @@ const TooltipContent = (props: TooltipContentProps) => {
                                 </div>
                             }
                         />
-                    )}
+                    ) : null}
                 </div>
             </div>
         </div>

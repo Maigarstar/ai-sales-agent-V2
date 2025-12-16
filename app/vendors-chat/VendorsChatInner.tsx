@@ -1,73 +1,106 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { Send, Bot, Trash2 } from "lucide-react"; 
 
-type ChatRole = "user" | "assistant";
-type ChatType = "vendor" | "couple";
-
-type ChatMessage = {
-  role: ChatRole;
+type Message = {
+  role: "user" | "assistant";
   content: string;
 };
 
-function introFor(chatType: ChatType): string {
-  if (chatType === "couple") {
-    return "Hello, I am your 5 Star Weddings concierge. Tell me a little about your wedding plans, location and guest numbers, and I can help you find the right venues and vendors.";
-  }
-  return "Hello, I am your 5 Star Weddings concierge. Tell me a little about your venue or business and what kind of enquiries you would like more of.";
-}
-
-export default function VendorsChatPage() {
+export default function VendorsChatInner() {
   const searchParams = useSearchParams();
-
+  
+  // 1. Capture URL Params (Embed logic)
   const isEmbed = searchParams.get("embed") === "1";
+  const initialChatType = searchParams.get("chatType") === "couple" ? "couple" : "vendor";
+  const organisationId = searchParams.get("organisationId") || "9ecd45ab-6ed2-46fa-914b-82be313e06e4";
+  const agentId = searchParams.get("agentId") || "70660422-489c-4b7d-81ae-b786e43050db";
 
-  const initialChatType: ChatType =
-    searchParams.get("chatType") === "couple" ? "couple" : "vendor";
-
-  const [chatType, setChatType] = useState<ChatType>(initialChatType);
-
-  const organisationId =
-    searchParams.get("organisationId") ||
-    "9ecd45ab-6ed2-46fa-914b-82be313e06e4";
-
-  const agentId =
-    searchParams.get("agentId") ||
-    "70660422-489c-4b7d-81ae-b786e43050db";
-
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: introFor(initialChatType) },
-  ]);
+  // 2. UI State
+  const [view, setView] = useState<"form" | "chat">("form"); // Start with FORM
+  const [mode, setMode] = useState<"vendor" | "couple">(initialChatType);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  
+  // 3. Chat Data
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // new, track conversation id that comes back from the backend
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  // 4. Form Data
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    venueOrLocation: "",
+    weddingDate: ""
+  });
+  const [formError, setFormError] = useState("");
+  const [isStarting, setIsStarting] = useState(false);
 
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
-
-  // Reset conversation when switching between vendor and couple
+  // Scroll to bottom of chat
   useEffect(() => {
-    setMessages([{ role: "assistant", content: introFor(chatType) }]);
-    setError(null);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, loading, view]);
+
+  // --- ACTION: Submit Form & Start Chat ---
+  const handleStartChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError("");
+    setIsStarting(true);
+
+    try {
+      const res = await fetch("/api/chat/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_type: mode === "vendor" ? "vendor" : "planning",
+          contact_name: formData.name,
+          contact_email: formData.email,
+          contact_phone: formData.phone,
+          venue_or_location: formData.venueOrLocation, // This now maps correctly in your backend!
+          wedding_date: formData.weddingDate,
+          organisationId, // Pass these through if needed
+          agentId
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.ok && data.conversationId) {
+        setConversationId(data.conversationId);
+        setView("chat"); // SWITCH TO CHAT VIEW
+        
+        // Add an initial welcome message
+        setMessages([{ 
+          role: "assistant", 
+          content: mode === 'couple' 
+            ? "Hello! I'm your wedding concierge. How can I help you plan your big day?" 
+            : "Hello! I'm your wedding concierge. How can I help with your venue or business?" 
+        }]);
+      } else {
+        setFormError(data.error || "Could not start chat.");
+      }
+    } catch (err) {
+      console.error("Start chat error:", err);
+      setFormError("Network error. Please try again.");
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  // --- ACTION: Send Message ---
+  const handleSend = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim() || !conversationId) return;
+
+    const userMsg: Message = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
-    setConversationId(null);
-  }, [chatType]);
-
-  async function handleSend() {
-    const text = input.trim();
-    if (!text || loading) return;
-
-    const newMessages: ChatMessage[] = [
-      ...messages,
-      { role: "user", content: text },
-    ];
-
-    setMessages(newMessages);
-    setInput("");
-    setError(null);
     setLoading(true);
 
     try {
@@ -75,355 +108,194 @@ export default function VendorsChatPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          messages: [...messages, userMsg],
+          chatType: mode,
+          conversationId: conversationId,
           organisationId,
-          agentId,
-          chatType,
-          messages: newMessages,
-          // pass conversation id if you have one
-          conversationId,
+          agentId
         }),
       });
 
-      const json = await res.json();
-
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || "Chat request failed");
+      const data = await res.json();
+      
+      if (data.reply) {
+        setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
       }
-
-      // pick up conversation id from the backend if it is sent back
-      const newConversationId =
-        json.conversationId ||
-        json.conversation_id ||
-        json.conversation?.id ||
-        null;
-
-      if (newConversationId) {
-        setConversationId(newConversationId);
-      }
-
-      const replyText: string =
-        json.reply || "Thank you, I have received your message.";
-
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: replyText },
-      ]);
-    } catch (err: any) {
-      console.error("vendors chat error", err);
-      setError(err?.message || "Something went wrong, please try again.");
+    } catch (err) {
+      console.error("Chat error:", err);
     } finally {
       setLoading(false);
-      if (inputRef.current) {
-        inputRef.current.focus();
-      }
     }
-  }
+  };
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  }
+  };
 
-  // new, delete or clear the chat from the user side
-  async function handleDeleteConversation() {
-    // if we do not know the id yet, just clear the local chat
-    if (!conversationId) {
-      const yes = confirm("Clear this chat and start again");
-      if (!yes) return;
-      setMessages([{ role: "assistant", content: introFor(chatType) }]);
-      setError(null);
-      setInput("");
-      return;
-    }
-
-    const yes = confirm("Delete this conversation and its messages");
-    if (!yes) return;
-
-    try {
-      const res = await fetch("/api/vendor/delete-conversation", {
+  // --- ACTION: Delete/Clear ---
+  const handleDeleteConversation = async () => {
+    if (!confirm("Are you sure you want to end this chat?")) return;
+    
+    // Optional: Call backend to delete
+    if (conversationId) {
+       await fetch("/api/vendor/delete-conversation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversation_id: conversationId }),
-      });
-
-      const json = await res.json();
-      if (!json.ok) {
-        alert(json.error || "Could not delete this conversation");
-        return;
-      }
-
-      // reset to a fresh intro
-      setMessages([{ role: "assistant", content: introFor(chatType) }]);
-      setError(null);
-      setInput("");
-      setConversationId(null);
-    } catch (err) {
-      console.error("vendor delete conversation error", err);
-      alert("There was an error deleting this conversation");
+      }).catch(console.error);
     }
+
+    // Reset State
+    setView("form");
+    setMessages([]);
+    setConversationId(null);
+    setFormData({ name: "", email: "", phone: "", venueOrLocation: "", weddingDate: "" });
+  };
+
+  // --- RENDER: FORM VIEW ---
+  if (view === "form") {
+    return (
+      <div className={`flex flex-col justify-center font-sans bg-gray-50 ${isEmbed ? 'min-h-screen py-0' : 'min-h-screen py-12 sm:px-6 lg:px-8'}`}>
+        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center px-4">
+          <h1 className="text-3xl font-serif text-[#1F4D3E] mb-2">
+            Wedding Concierge
+          </h1>
+          <p className="text-gray-600 mb-6">
+            Please tell us a bit about yourself to start.
+          </p>
+
+          <div className="flex justify-center mb-6">
+            <div className="bg-white p-1 rounded-full border border-gray-200 inline-flex">
+              <button
+                onClick={() => setMode("vendor")}
+                type="button"
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  mode === "vendor" ? "bg-[#1F4D3E] text-white" : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                I am a Vendor
+              </button>
+              <button
+                onClick={() => setMode("couple")}
+                type="button"
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  mode === "couple" ? "bg-[#1F4D3E] text-white" : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                I am a Couple
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className={`bg-white shadow sm:rounded-lg border border-gray-100 ${isEmbed ? 'p-6 h-full shadow-none border-0' : 'py-8 px-6 sm:px-10'}`}>
+            <form className="space-y-5" onSubmit={handleStartChat}>
+              {formError && (
+                <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">
+                  {formError}
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Name</label>
+                <input required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#1F4D3E] focus:border-[#1F4D3E]" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#1F4D3E] focus:border-[#1F4D3E]" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#1F4D3E] focus:border-[#1F4D3E]" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Wedding Date</label>
+                  <input type="date" value={formData.weddingDate} onChange={(e) => setFormData({...formData, weddingDate: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#1F4D3E] focus:border-[#1F4D3E]" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">{mode === 'vendor' ? 'Company / Venue Name' : 'Venue Location / Preferences'}</label>
+                <input type="text" value={formData.venueOrLocation} onChange={(e) => setFormData({...formData, venueOrLocation: e.target.value})} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#1F4D3E] focus:border-[#1F4D3E]" />
+              </div>
+
+              <button type="submit" disabled={isStarting} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#1F4D3E] hover:bg-[#163C30] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F4D3E] disabled:opacity-50">
+                {isStarting ? "Starting..." : "Start Chatting"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const wrapperPadding = isEmbed ? "8px 10px" : "32px";
-  const wrapperMaxWidth = isEmbed ? "100%" : "720px";
-  const wrapperHeight = isEmbed ? "100vh" : "calc(100vh - 64px)";
-
+  // --- RENDER: CHAT VIEW ---
   return (
-    <div
-      style={{
-        padding: wrapperPadding,
-        maxWidth: wrapperMaxWidth,
-        margin: isEmbed ? "0" : "0 auto",
-        height: wrapperHeight,
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily:
-          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        backgroundColor: isEmbed ? "#ffffff" : "#f7f7f7",
-      }}
-    >
-      {!isEmbed && (
-        <>
-          <h1
-            style={{
-              fontSize: 24,
-              marginBottom: 4,
-              fontFamily: "Gilda Display, serif",
-              color: "#183F34",
-            }}
-          >
-            Wedding concierge chat
-          </h1>
-          <p style={{ fontSize: 14, color: "#555", marginBottom: 16 }}>
-            Talk to your AI concierge as if you were a venue, vendor or couple.
-            Each conversation is saved and scored in your admin dashboard.
-          </p>
-        </>
-      )}
-
-      {/* Toggle tabs */}
-      <div
-        style={{
-          display: "flex",
-          borderRadius: 999,
-          border: "1px solid #d4d4d4",
-          overflow: "hidden",
-          marginBottom: 12,
-          backgroundColor: "#ffffff",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setChatType("vendor")}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 500,
-            backgroundColor:
-              chatType === "vendor" ? "#183F34" : "transparent",
-            color: chatType === "vendor" ? "#ffffff" : "#183F34",
-          }}
-        >
-          I am a venue or vendor
-        </button>
-        <button
-          type="button"
-          onClick={() => setChatType("couple")}
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 500,
-            backgroundColor:
-              chatType === "couple" ? "#183F34" : "transparent",
-            color: chatType === "couple" ? "#ffffff" : "#183F34",
-          }}
-        >
-          I am a couple planning a wedding
+    <div className={`flex flex-col bg-white sm:bg-gray-50 text-gray-900 font-sans ${isEmbed ? 'h-screen' : 'h-[calc(100vh-64px)]'}`}>
+      
+      {/* HEADER */}
+      <div className="bg-white p-4 shadow-sm z-10 flex justify-between items-center border-b border-gray-100">
+        <div>
+           <h1 className="text-xl font-serif text-[#1F4D3E]">Concierge Chat</h1>
+           <p className="text-xs text-gray-500">Chatting as {formData.name}</p>
+        </div>
+        <button onClick={handleDeleteConversation} className="text-gray-400 hover:text-red-500 transition-colors p-2" title="End Chat">
+          <Trash2 size={18} />
         </button>
       </div>
 
-      {/* Chat container */}
-      <div
-        style={{
-          flex: 1,
-          borderRadius: 12,
-          border: "1px solid #e2e2e2",
-          backgroundColor: "#ffffff",
-          padding: 12,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* new header row inside the chat box */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 6,
-          }}
-        >
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#183F34" }}>
-            Chat with your concierge
-          </span>
-          <button
-            type="button"
-            onClick={handleDeleteConversation}
-            style={{
-              fontSize: 11,
-              padding: "4px 10px",
-              borderRadius: 999,
-              border: "1px solid #e11d48",
-              backgroundColor: "#ffffff",
-              color: "#e11d48",
-              cursor: "pointer",
-            }}
-          >
-            Delete chat
-          </button>
-        </div>
-
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            paddingRight: 4,
-            marginBottom: 8,
-          }}
-        >
-          {messages.map((m, idx) => (
-            <div
-              key={idx}
-              style={{
-                marginBottom: 8,
-                display: "flex",
-                justifyContent: m.role === "user" ? "flex-end" : "flex-start",
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: "80%",
-                  padding: "8px 10px",
-                  borderRadius: 10,
-                  fontSize: 14,
-                  lineHeight: 1.4,
-                  backgroundColor:
-                    m.role === "user" ? "#183F34" : "#f0f4f3",
-                  color: m.role === "user" ? "#ffffff" : "#183F34",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
+      {/* MESSAGES */}
+      <div className="flex-1 overflow-hidden relative w-full max-w-3xl mx-auto sm:px-4 sm:pb-4">
+        <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-4 scroll-smooth pb-20 sm:pb-4">
+          {messages.map((m, i) => (
+            <div key={i} className={`flex w-full ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[85%] sm:max-w-[75%] px-5 py-3 rounded-2xl text-[15px] sm:text-base leading-relaxed shadow-sm ${m.role === "user" ? "bg-[#1F4D3E] text-white rounded-br-none" : "bg-gray-100 text-gray-800 rounded-bl-none"}`}>
                 {m.content}
               </div>
             </div>
           ))}
+          {loading && (
+            <div className="flex justify-start w-full">
+               <div className="bg-gray-100 px-5 py-4 rounded-2xl rounded-bl-none flex space-x-1 items-center">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          )}
         </div>
+      </div>
 
-        {error && (
-          <div
-            style={{
-              marginBottom: 6,
-              fontSize: 12,
-              color: "crimson",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <div
-          style={{
-            borderTop: "1px solid #e5e5e5",
-            paddingTop: 8,
-          }}
-        >
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message and press Enter to send. Shift plus Enter for a new line."
-            style={{
-              width: "100%",
-              minHeight: 60,
-              maxHeight: 120,
-              resize: "vertical",
-              fontSize: 14,
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #cccccc",
-              boxSizing: "border-box",
-              fontFamily:
-                "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            }}
-          />
-          <div
-            style={{
-              marginTop: 6,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 11,
-                color: "#888",
-              }}
-            >
-              Press Enter to send, Shift plus Enter for a new line.
-            </span>
+      {/* INPUT */}
+      <div className="bg-white border-t border-gray-100 p-3 sm:p-4 w-full z-20">
+        <div className="max-w-3xl mx-auto relative flex items-end gap-2 bg-white sm:bg-transparent">
+          <div className="flex-1 relative">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message..."
+              className="w-full bg-white sm:bg-gray-50 border border-gray-300 rounded-2xl pl-4 pr-12 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#1F4D3E] focus:border-transparent resize-none shadow-sm"
+              rows={1}
+              style={{ minHeight: "50px", maxHeight: "120px" }}
+            />
             <button
-              type="button"
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={loading || !input.trim()}
-              style={{
-                padding: "8px 14px",
-                fontSize: 13,
-                borderRadius: 999,
-                border: "none",
-                cursor:
-                  loading || !input.trim() ? "default" : "pointer",
-                backgroundColor:
-                  loading || !input.trim() ? "#cccccc" : "#183F34",
-                color: "#ffffff",
-              }}
+              className="absolute right-2 bottom-2 p-2 bg-[#1F4D3E] text-white rounded-xl hover:bg-[#163C30] disabled:opacity-50 transition-colors shadow-sm"
             >
-              {loading ? "Sending..." : "Send"}
+              <Send size={18} />
             </button>
           </div>
         </div>
       </div>
-
-      {!isEmbed && (
-        <p
-          style={{
-            marginTop: 10,
-            fontSize: 12,
-            color: "#888",
-            textAlign: "right",
-          }}
-        >
-          Powered by{" "}
-          <a
-            href="https://taigenic.ai"
-            target="_blank"
-            rel="noreferrer"
-            style={{ color: "#183F34", textDecoration: "none" }}
-          >
-            Taigenic.ai
-          </a>
-        </p>
-      )}
     </div>
   );
 }

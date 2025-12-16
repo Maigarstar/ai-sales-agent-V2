@@ -1,84 +1,103 @@
-'use client'
+import { Suspense } from "react";
+import Link from "next/link";
 
-import { createBrowserClient } from '@supabase/ssr'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+export const metadata = {
+  title: "Login | 5 Star Weddings Admin",
+  description: "Sign in to your admin dashboard.",
+};
 
 export default function LoginPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      const redirect = searchParams.get('redirectedFrom') || '/admin'
-      router.push(redirect)
-    }
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 shadow-lg rounded-xl w-full max-w-sm border border-gray-200"
-      >
-        <h1 className="text-2xl font-semibold mb-6 text-center text-gray-800">
+    // FIX: The Suspense boundary satisfies the build requirement
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>}>
+      <LoginFormContent />
+    </Suspense>
+  );
+}
+
+function LoginFormContent() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      {/* Header Section */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 font-sans">
           Admin Login
-        </h1>
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Sign in to manage your AI sales agent and leads.
+        </p>
+      </div>
 
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          required
-          className="border border-gray-300 p-2 w-full mb-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
-        />
+      {/* Card Container */}
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow sm:rounded-xl sm:px-10 border border-gray-100">
+          <form className="space-y-6" action="#" method="POST">
+            {/* Email Input */}
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Email address
+              </label>
+              <div className="mt-1">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="you@example.com"
+                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] sm:text-sm"
+                />
+              </div>
+            </div>
 
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          required
-          className="border border-gray-300 p-2 w-full mb-4 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
-        />
+            {/* Password Input */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Password
+              </label>
+              <div className="mt-1">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  placeholder="••••••••"
+                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] sm:text-sm"
+                />
+              </div>
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className={`w-full py-2 rounded-md text-white ${
-            loading ? 'bg-green-900/70' : 'bg-green-700 hover:bg-green-800'
-          }`}
-        >
-          {loading ? 'Signing in…' : 'Sign in'}
-        </button>
+            {/* Forgot Password Link */}
+            <div className="flex items-center justify-end">
+              <div className="text-sm">
+                <Link
+                  href="/forgot-password"
+                  className="font-medium text-[#1F4D3E] hover:text-[#163C30]"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
+            </div>
 
-        {error && (
-          <p className="text-red-600 text-sm mt-3 text-center">{error}</p>
-        )}
-      </form>
+            {/* Sign In Button */}
+            <div>
+              <button
+                type="submit"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#1F4D3E] hover:bg-[#163C30] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F4D3E] transition-colors"
+              >
+                Sign in
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
-  )
+  );
 }

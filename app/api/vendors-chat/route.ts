@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
+// FORCE DYNAMIC: This ensures the route always checks for the latest keys
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -23,16 +27,19 @@ type LeadMetadata = {
   [key: string]: any;
 };
 
+// FIX 1: Use 'dummy-key' instead of empty string "" to prevent build crashes
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
+  apiKey: process.env.OPENAI_API_KEY || "dummy-key",
 });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+// FIX 2: Add placeholder fallbacks for Supabase variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key";
 
 function getSupabaseServerClient() {
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("Missing Supabase environment variables");
+  // FIX 3: If we are building (using placeholder), return null safely
+  if (supabaseUrl === "https://placeholder.supabase.co" || !supabaseServiceKey) {
+    // console.log("Build mode: Skipping Supabase connection");
     return null;
   }
 
@@ -40,9 +47,6 @@ function getSupabaseServerClient() {
     auth: { persistSession: false },
   });
 }
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export async function POST(req: Request) {
   try {
@@ -73,9 +77,11 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { ok: false, error: "OPENAI_API_KEY missing" },
+    // RUNTIME CHECK: Ensure we have a real key before calling OpenAI
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.startsWith("dummy")) {
+       console.error("VENDORS CHAT ERROR: OpenAI Key is missing or invalid in Production.");
+       return NextResponse.json(
+        { ok: false, error: "OPENAI_API_KEY missing or invalid" },
         { status: 500 }
       );
     }

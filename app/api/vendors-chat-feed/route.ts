@@ -1,49 +1,35 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "../../../lib/supabaseAdmin"; // ✅ corrected path
 
-export async function GET() {
+export async function POST(req: Request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE ||
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabase = getSupabaseAdmin();
+    if (!supabase) throw new Error("Supabase client not initialized");
 
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn("Supabase settings missing for vendors chat feed", {
-        hasUrl: !!supabaseUrl,
-        hasKey: !!supabaseKey,
-      });
+    const body = await req.json();
+    const { vendor_id } = body;
 
-      return NextResponse.json({ messages: [] }, { status: 200 });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    const { data, error } = await supabase
-      .from("vendor_chat_messages")
-      .select("id, created_at, role, content")
-      .order("created_at", { ascending: true })
-      .limit(200);
-
-    if (error) {
-      console.error("Supabase feed error", error);
+    if (!vendor_id) {
       return NextResponse.json(
-        { messages: [], error: error.message },
-        { status: 200 }
+        { ok: false, error: "Missing vendor_id" },
+        { status: 400 }
       );
     }
 
-    return NextResponse.json(
-      { messages: data ?? [] },
-      { status: 200 }
-    );
-  } catch (err: any) {
-    console.error("VENDORS CHAT FEED API ERROR:", err);
+    const { data, error } = await supabase
+      .from("vendor_messages")
+      .select("*")
+      .eq("vendor_id", vendor_id)
+      .order("created_at", { ascending: true });
 
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true, messages: data });
+  } catch (err: any) {
+    console.error("vendors-chat-feed error:", err);
     return NextResponse.json(
-      { messages: [], error: err?.message || "unknown error" },
-      { status: 200 }
+      { ok: false, error: err.message || "Unknown error" },
+      { status: 500 }
     );
   }
 }

@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE!
-);
+import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
 
 export async function GET() {
-  const { data, error } = await supabase
-    .from("vendor_applications")
-    .select("*")
-    .order("created_at", { ascending: false });
+  try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) throw new Error("Supabase client not initialized");
 
-  return NextResponse.json(data || []);
+    const { data, error } = await supabase
+      .from("vendors")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true, vendors: data });
+  } catch (err: any) {
+    console.error("get-vendors error:", err);
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+  }
 }

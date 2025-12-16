@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE!
-);
+import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin"; // path adjusted to go up 3 levels
 
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) throw new Error("Supabase client not initialized");
+
     const body = await req.json();
-    const { chat } = body; // this is the chat row you send from the frontend
+    const { chat } = body; // this is the chat row sent from frontend
 
     if (!chat || !chat.id) {
       return NextResponse.json(

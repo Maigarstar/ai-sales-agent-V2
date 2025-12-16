@@ -1,31 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin"; // fixed path
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Use service role for admin
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error(
-    "Supabase URL or SUPABASE_SERVICE_ROLE_KEY is missing in lead-ai-insights route"
-  );
-}
-
-const supabase =
-  supabaseUrl && supabaseServiceKey
-    ? createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { persistSession: false },
-      })
-    : null;
-
 export async function GET(req: Request) {
   try {
+    const supabase = getSupabaseAdmin();
+
     if (!supabase) {
       return NextResponse.json(
-        { ok: false, error: "Supabase admin client is not configured" },
+        { ok: false, error: "Supabase admin client not configured" },
         { status: 500 }
       );
     }
@@ -58,21 +43,18 @@ export async function GET(req: Request) {
       .single();
 
     if (error) {
-      console.error("lead-ai-insights vendor_leads error", error);
+      console.error("lead-ai-insights vendor_leads error:", error.message);
       return NextResponse.json(
         { ok: false, error: error.message || "Failed to load lead" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(
-      { ok: true, lead: data },
-      { status: 200 }
-    );
+    return NextResponse.json({ ok: true, lead: data }, { status: 200 });
   } catch (err: any) {
-    console.error("lead-ai-insights route error", err);
+    console.error("lead-ai-insights route error:", err);
     return NextResponse.json(
-      { ok: false, error: "Server error in lead-ai-insights" },
+      { ok: false, error: err.message || "Server error in lead-ai-insights" },
       { status: 500 }
     );
   }

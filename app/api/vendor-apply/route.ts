@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Supabase admin client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE!
-);
-
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) throw new Error("Supabase client not initialized");
+
     const body = await req.json();
 
     const {
@@ -28,9 +25,7 @@ export async function POST(req: Request) {
       message_to_editorial_team,
     } = body;
 
-    // ---------------------------------------------
     // 1. SAVE IN SUPABASE
-    // ---------------------------------------------
     const { data, error } = await supabase
       .from("vendor_applications")
       .insert([
@@ -54,12 +49,13 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error("SUPABASE ERROR:", error);
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 }
+      );
     }
 
-    // ---------------------------------------------
     // 2. SEND EMAIL TO YOU
-    // ---------------------------------------------
     const html = `
       <div style="font-family: Arial; line-height: 1.6;">
         <h2>New Vendor Application</h2>
@@ -92,19 +88,16 @@ export async function POST(req: Request) {
       html,
     });
 
-    // ---------------------------------------------
-    // 3. SEND RESPONSE TO FRONTEND
-    // ---------------------------------------------
+    // 3. RETURN RESPONSE
     return NextResponse.json({
       ok: true,
       id: data.id,
       message: "Vendor application submitted successfully.",
     });
-
   } catch (err: any) {
     console.error("VENDOR APPLY ROUTE ERROR:", err);
     return NextResponse.json(
-      { ok: false, error: err.message },
+      { ok: false, error: err.message || "Unknown error" },
       { status: 500 }
     );
   }

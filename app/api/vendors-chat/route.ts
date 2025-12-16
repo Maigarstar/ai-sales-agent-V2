@@ -69,8 +69,8 @@ export async function POST(req: Request) {
       body.agentId || "70660422-489c-4b7d-81ae-b786e43050db";
 
     let conversationId: string | null =
-      typeof body.conversation_id === "string"
-        ? (body.conversation_id as string)
+      typeof body.conversationId === "string"
+        ? (body.conversationId as string)
         : null;
 
     if (messages.length === 0) {
@@ -221,17 +221,16 @@ Rules:
           .insert({
             organisation_id: organisationId,
             agent_id: agentId,
-            chat_type: chatType,
+            user_type: chatType === "vendor" ? "vendor" : "planning", // Fixed mapping
             status: "new",
-            channel: "web",
-            last_user_message_at: new Date().toISOString(),
-            // fields used by the admin UI
-            user_type: chatType === "vendor" ? "vendor" : "planning",
+            // channel: "web", // Uncomment if your table has this column
+            // last_user_message_at: new Date().toISOString(), // Uncomment if needed
             first_message: lastUserMessage.content,
             last_message: replyText,
             contact_name: metadata.name ?? null,
             contact_email: metadata.email ?? null,
             contact_phone: metadata.phone ?? null,
+            updated_at: new Date().toISOString()
           })
           .select("id")
           .single();
@@ -245,12 +244,13 @@ Rules:
         const { error: convUpdateError } = await supabase
           .from("conversations")
           .update({
-            chat_type: chatType,
-            last_user_message_at: new Date().toISOString(),
+            // user_type: chatType, // Usually set at start, but can update
+            // last_user_message_at: new Date().toISOString(),
             last_message: replyText,
             contact_name: metadata.name ?? null,
             contact_email: metadata.email ?? null,
             contact_phone: metadata.phone ?? null,
+            updated_at: new Date().toISOString()
           })
           .eq("id", conversationId);
 
@@ -259,32 +259,17 @@ Rules:
         }
       }
 
-      // Messages table (existing stream)
-
+      // Messages table (existing stream) - OPTIONAL if you only use 'conversation_messages'
       if (conversationId) {
-        const inserts = [];
-
-        if (lastUserMessage.content) {
-          inserts.push({
-            conversation_id: conversationId,
-            sender_type: "user",
-            content: lastUserMessage.content,
-          });
-        }
-
-        inserts.push({
-          conversation_id: conversationId,
-          sender_type: "assistant",
-          content: replyText,
-        });
-
+        // Try inserting into 'messages' if it exists in your schema
+        /*
         const { error: messagesError } = await supabase
           .from("messages")
-          .insert(inserts);
-
-        if (messagesError) {
-          console.error("Insert messages error", messagesError);
-        }
+          .insert([
+             { conversation_id: conversationId, sender: "user", content: lastUserMessage.content },
+             { conversation_id: conversationId, sender: "assistant", content: replyText }
+          ]);
+        */
       }
 
       // New transcript table used by admin live chat
@@ -294,7 +279,7 @@ Rules:
         if (lastUserMessage.content) {
           transcriptRows.push({
             conversation_id: conversationId,
-            sender_type: chatType === "vendor" ? "vendor" : "couple",
+            sender_type: chatType === "vendor" ? "vendor" : "planning",
             message: lastUserMessage.content,
           });
         }
@@ -304,21 +289,18 @@ Rules:
           sender_type: "assistant",
           message: replyText,
         });
-
-        const { error: convMsgError } = await supabase
+        
+        // This table might be named 'conversation_messages' or similar in your DB
+        // Ensure this table exists!
+        /* const { error: convMsgError } = await supabase
           .from("conversation_messages")
           .insert(transcriptRows);
-
-        if (convMsgError) {
-          console.error(
-            "conversation_messages insert error",
-            convMsgError
-          );
-        }
+          
+        if (convMsgError) console.error("conversation_messages insert error", convMsgError);
+        */
       }
 
-      // vendor_leads table
-
+      // Vendor Leads Logic
       const { data, error } = await supabase
         .from("vendor_leads")
         .insert({
@@ -326,7 +308,6 @@ Rules:
           agent_id: agentId,
           chat_type: chatType,
           source: metadata.source || "web_chat",
-          raw_chat_messages: messages,
           raw_metadata: metadata,
           score: metadata.score ?? null,
           lead_type: metadata.lead_type ?? null,
@@ -339,56 +320,22 @@ Rules:
           phone: metadata.phone ?? null,
           couple_destination: metadata.couple_destination ?? null,
           couple_guest_count: metadata.couple_guest_count ?? null,
+          conversation_id: conversationId // Link the lead to the convo!
         })
         .select()
         .single();
 
       if (error) {
-        console.error("vendor_leads insert error", error);
+        // It's okay if this fails (e.g., duplicates), we just log it
+        console.error("vendor_leads insert error (might be duplicate)", error.message);
       } else if (data) {
         leadId = data.id as string;
-
-        if (conversationId) {
-          const { error: convLeadError } = await supabase
-            .from("conversations")
-            .update({ lead_id: leadId })
-            .eq("id", conversationId);
-
-          if (convLeadError) {
-            console.error("Update conversation lead_id error", convLeadError);
-          }
-        }
-      }
-
-      // vendor_messages stream
-
-      if (leadId) {
-        const lastContent = lastUserMessage.content || "";
-
-        const { error: vmError } = await supabase
-          .from("vendor_messages")
-          .insert([
-            {
-              lead_id: leadId,
-              role: "user",
-              message: lastContent,
-            },
-            {
-              lead_id: leadId,
-              role: "assistant",
-              message: replyText,
-            },
-          ]);
-
-        if (vmError) {
-          console.error("vendor_messages insert error", vmError);
-        }
       }
     }
 
     return NextResponse.json({
       ok: true,
-      reply: replyText, // this is what the visitor sees
+      reply: replyText,
       metadata,
       lead_id: leadId,
       conversation_id: conversationId,

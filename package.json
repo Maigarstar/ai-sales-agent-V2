@@ -38,7 +38,7 @@
     "next": "^16.0.10",
     "next-auth": "^4.24.13",
     "nodemailer": "^7.0.11",
-    "openai": "^6.9.1",
+    "openai": "^6.14.0",
     "poplib": "^0.1.7",
     "react": "^18.3.1",
     "react-apexcharts": "^1.9.0",

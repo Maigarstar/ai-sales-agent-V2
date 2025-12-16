@@ -102,4 +102,12 @@ function ForgotPasswordForm() {
           </form>
 
           <div className="mt-6 text-center">
-            <Link href="/login" className="text-sm font-medium text-[#1F4D3E] hover:text-[#16
+            <Link href="/login" className="text-sm font-medium text-[#1F4D3E] hover:text-[#163C30]">
+              &larr; Back to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

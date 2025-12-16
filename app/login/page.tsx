@@ -1,15 +1,13 @@
-"use client"; // <--- 1. This marks it as a Client Component
+"use client";
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 
-// 2. We removed 'export const metadata' to fix your build error.
-
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white">Loading...</div>}>
       <LoginForm />
     </Suspense>
   );
@@ -20,7 +18,6 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle the Login Logic
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -30,7 +27,6 @@ function LoginForm() {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    // Create a client-side Supabase instance
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -45,16 +41,18 @@ function LoginForm() {
       setError(signInError.message);
       setLoading(false);
     } else {
-      // Success! Redirect to admin dashboard
       router.push("/admin");
       router.refresh();
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 font-sans">
+    // CHANGE: 'bg-white' on mobile, 'sm:bg-gray-50' on desktop.
+    <div className="min-h-screen bg-white sm:bg-gray-50 flex flex-col justify-center py-8 sm:py-12 sm:px-6 lg:px-8">
+      
+      {/* Header */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
+        <h2 className="mt-2 text-center text-2xl sm:text-3xl font-extrabold text-gray-900 font-sans">
           Admin Login
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
@@ -62,11 +60,12 @@ function LoginForm() {
         </p>
       </div>
 
+      {/* Card Wrapper */}
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-xl sm:px-10 border border-gray-100">
+        {/* CHANGE: Remove shadow/border on mobile. Add them back on 'sm:' screens */}
+        <div className="bg-white py-8 px-6 shadow-none sm:shadow sm:rounded-xl sm:px-10 border-0 sm:border border-gray-100">
           <form className="space-y-6" onSubmit={handleLogin}>
             
-            {/* Error Message Alert */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -78,6 +77,7 @@ function LoginForm() {
                 Email address
               </label>
               <div className="mt-1">
+                {/* CHANGE: text-base prevents iOS zoom on focus */}
                 <input
                   id="email"
                   name="email"
@@ -85,7 +85,7 @@ function LoginForm() {
                   autoComplete="email"
                   required
                   placeholder="you@example.com"
-                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] sm:text-sm"
+                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] text-base sm:text-sm"
                 />
               </div>
             </div>
@@ -102,7 +102,7 @@ function LoginForm() {
                   autoComplete="current-password"
                   required
                   placeholder="••••••••"
-                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] sm:text-sm"
+                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] text-base sm:text-sm"
                 />
               </div>
             </div>
@@ -119,7 +119,7 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#1F4D3E] hover:bg-[#163C30] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F4D3E] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-[#1F4D3E] hover:bg-[#163C30] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F4D3E] transition-colors disabled:opacity-50"
               >
                 {loading ? "Signing in..." : "Sign in"}
               </button>

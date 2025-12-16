@@ -6,7 +6,7 @@ import { createBrowserClient } from "@supabase/ssr";
 
 export default function ForgotPasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white">Loading...</div>}>
       <ForgotPasswordForm />
     </Suspense>
   );
@@ -31,7 +31,6 @@ function ForgotPasswordForm() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // This sends a password reset link to the user's email
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/admin/reset-password`,
     });
@@ -45,9 +44,9 @@ function ForgotPasswordForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 font-sans">
+    <div className="min-h-screen bg-white sm:bg-gray-50 flex flex-col justify-center py-8 sm:py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
+        <h2 className="mt-2 text-center text-2xl sm:text-3xl font-extrabold text-gray-900 font-sans">
           Reset Password
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
@@ -56,17 +55,15 @@ function ForgotPasswordForm() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-xl sm:px-10 border border-gray-100">
+        <div className="bg-white py-8 px-6 shadow-none sm:shadow sm:rounded-xl sm:px-10 border-0 sm:border border-gray-100">
           <form className="space-y-6" onSubmit={handleReset}>
             
-            {/* Success Message */}
             {message && (
               <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
                 {message}
               </div>
             )}
 
-            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -85,7 +82,7 @@ function ForgotPasswordForm() {
                   autoComplete="email"
                   required
                   placeholder="you@example.com"
-                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] sm:text-sm"
+                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] text-base sm:text-sm"
                 />
               </div>
             </div>
@@ -94,7 +91,7 @@ function ForgotPasswordForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#1F4D3E] hover:bg-[#163C30] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F4D3E] transition-colors disabled:opacity-50"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-[#1F4D3E] hover:bg-[#163C30] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F4D3E] transition-colors disabled:opacity-50"
               >
                 {loading ? "Sending link..." : "Send Reset Link"}
               </button>

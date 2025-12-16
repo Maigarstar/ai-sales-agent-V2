@@ -27,9 +27,13 @@ type LeadMetadata = {
   [key: string]: any;
 };
 
-// FIX 1: Use 'dummy-key' instead of empty string "" to prevent build crashes
+// FIX 1: THE SECRET TUNNEL
+// Look for LIVE_OPENAI_KEY first. If that fails, look for standard key.
+// Finally, fallback to 'dummy-key' so the build never crashes.
+const apiKey = process.env.LIVE_OPENAI_KEY || process.env.OPENAI_API_KEY || "dummy-key";
+
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "dummy-key",
+  apiKey: apiKey,
 });
 
 // FIX 2: Add placeholder fallbacks for Supabase variables
@@ -39,7 +43,6 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder
 function getSupabaseServerClient() {
   // FIX 3: If we are building (using placeholder), return null safely
   if (supabaseUrl === "https://placeholder.supabase.co" || !supabaseServiceKey) {
-    // console.log("Build mode: Skipping Supabase connection");
     return null;
   }
 
@@ -78,7 +81,7 @@ export async function POST(req: Request) {
     }
 
     // RUNTIME CHECK: Ensure we have a real key before calling OpenAI
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.startsWith("dummy")) {
+    if (!apiKey || apiKey.startsWith("dummy")) {
        console.error("VENDORS CHAT ERROR: OpenAI Key is missing or invalid in Production.");
        return NextResponse.json(
         { ok: false, error: "OPENAI_API_KEY missing or invalid" },

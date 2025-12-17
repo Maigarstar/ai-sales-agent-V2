@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Send, Trash2 } from "lucide-react";
 import AuraVoice from "@/components/AuraVoice";
+import VoiceToTextButton from "@/components/VoiceToTextButton";
 
 type Message = {
   role: "user" | "assistant";
@@ -13,7 +14,7 @@ type Message = {
 export default function VendorsChatInner() {
   const searchParams = useSearchParams();
 
-  // 1. Capture URL Params (Embed logic)
+  // URL params
   const isEmbed = searchParams.get("embed") === "1";
   const initialChatType =
     searchParams.get("chatType") === "couple" ? "couple" : "vendor";
@@ -23,18 +24,18 @@ export default function VendorsChatInner() {
   const agentId =
     searchParams.get("agentId") || "70660422-489c-4b7d-81ae-b786e43050db";
 
-  // 2. UI State
+  // UI state
   const [view, setView] = useState<"form" | "chat">("form");
   const [mode, setMode] = useState<"vendor" | "couple">(initialChatType);
   const [conversationId, setConversationId] = useState<string | null>(null);
 
-  // 3. Chat Data
+  // Chat
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 4. Form Data
+  // Form
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -48,14 +49,14 @@ export default function VendorsChatInner() {
 
   const isVendor = mode === "vendor";
 
-  // Scroll to bottom of chat
+  // Scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, loading, view]);
 
-  // ACTION: Submit Form & Start Chat
+  // Start chat
   const handleStartChat = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -103,13 +104,15 @@ export default function VendorsChatInner() {
     }
   };
 
-  // ACTION: Send Message
+  // Send message
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim() || !conversationId) return;
 
     const userMsg: Message = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMsg]);
+    const nextMessages = [...messages, userMsg];
+
+    setMessages(nextMessages);
     setInput("");
     setLoading(true);
 
@@ -118,7 +121,7 @@ export default function VendorsChatInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, userMsg],
+          messages: nextMessages,
           chatType: mode,
           conversationId,
           organisationId,
@@ -129,10 +132,7 @@ export default function VendorsChatInner() {
       const data = await res.json();
 
       if (data.reply) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: data.reply },
-        ]);
+        setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
       }
     } catch (err) {
       console.error("Chat error:", err);
@@ -148,7 +148,7 @@ export default function VendorsChatInner() {
     }
   };
 
-  // ACTION: Delete/Clear
+  // End chat
   const handleDeleteConversation = async () => {
     if (!confirm("Are you sure you want to end this chat?")) return;
 
@@ -163,6 +163,7 @@ export default function VendorsChatInner() {
     setView("form");
     setMessages([]);
     setConversationId(null);
+    setInput("");
     setFormData({
       name: "",
       email: "",
@@ -173,14 +174,12 @@ export default function VendorsChatInner() {
     });
   };
 
-  // RENDER: FORM VIEW
+  // FORM VIEW
   if (view === "form") {
     return (
       <div
         className={`flex flex-col justify-center font-sans bg-gray-50 ${
-          isEmbed
-            ? "min-h-screen py-0"
-            : "min-h-screen py-12 sm:px-6 lg:px-8"
+          isEmbed ? "min-h-screen py-0" : "min-h-screen py-12 sm:px-6 lg:px-8"
         }`}
       >
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center px-4">
@@ -317,10 +316,7 @@ export default function VendorsChatInner() {
                   type="text"
                   value={formData.venueOrLocation}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      venueOrLocation: e.target.value,
-                    })
+                    setFormData({ ...formData, venueOrLocation: e.target.value })
                   }
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
                 />
@@ -340,14 +336,13 @@ export default function VendorsChatInner() {
     );
   }
 
-  // RENDER: CHAT VIEW
+  // CHAT VIEW
   return (
     <div
       className={`flex flex-col bg-white sm:bg-gray-50 text-gray-900 font-sans ${
         isEmbed ? "h-screen" : "h-[calc(100vh-64px)]"
       }`}
     >
-      {/* HEADER */}
       <div className="bg-white p-4 shadow-sm z-10 flex justify-between items-center border-b border-gray-100">
         <div>
           <h1 className="text-xl font-serif text-[#1F4D3E]">Concierge Chat</h1>
@@ -362,7 +357,6 @@ export default function VendorsChatInner() {
         </button>
       </div>
 
-      {/* MESSAGES */}
       <div className="flex-1 overflow-hidden relative w-full max-w-3xl mx-auto sm:px-4 sm:pb-4">
         <div
           ref={scrollRef}
@@ -408,7 +402,6 @@ export default function VendorsChatInner() {
         </div>
       </div>
 
-      {/* INPUT */}
       <div className="bg-white border-t border-gray-100 p-3 sm:p-4 w-full z-20">
         <div className="max-w-3xl mx-auto relative flex items-end gap-2 bg-white sm:bg-transparent">
           <div className="flex-1 relative">
@@ -417,14 +410,18 @@ export default function VendorsChatInner() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type your message..."
-              className="w-full bg-white sm:bg-gray-50 border border-gray-300 rounded-2xl pl-4 pr-28 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#1F4D3E] focus:border-transparent resize-none shadow-sm"
+              className="w-full bg-white sm:bg-gray-50 border border-gray-300 rounded-2xl pl-4 pr-44 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#1F4D3E] focus:border-transparent resize-none shadow-sm"
               rows={1}
               style={{ minHeight: "50px", maxHeight: "120px" }}
             />
 
-            {/* Voice + Send controls inside the composer */}
             <div className="absolute right-2 bottom-2 flex items-center gap-2">
+              <VoiceToTextButton
+                onText={(t) => setInput((prev) => (prev ? `${prev} ${t}` : t))}
+              />
+
               <AuraVoice />
+
               <button
                 onClick={() => handleSend()}
                 disabled={loading || !input.trim()}

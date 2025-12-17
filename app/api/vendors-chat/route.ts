@@ -11,7 +11,13 @@ export const revalidate = 0;
 /* ================================
    Types
 ================================ */
-type ChatMessage = { role: "user" | "assistant" | "tool" | "system"; content: string; name?: string; tool_call_id?: string };
+type ChatMessage = {
+  role: "user" | "assistant" | "tool" | "system";
+  content: string;
+  name?: string;
+  tool_call_id?: string;
+};
+
 type LeadMetadata = {
   score?: number;
   lead_type?: "Hot" | "Warm" | "Cold";
@@ -44,24 +50,20 @@ type LeadMetadata = {
 /* ================================
    OpenAI client
 ================================ */
-const apiKey = process.env.LIVE_OPENAI_KEY || process.env.OPENAI_API_KEY || "dummy-key";
+const apiKey = process.env.LIVE_OPENAI_KEY || process.env.OPENAI_API_KEY || "";
 const client = new OpenAI({ apiKey });
 
 /* ================================
    Supabase
 ================================ */
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 function getSupabaseServerClient() {
-  if (
-    supabaseUrl === "https://placeholder.supabase.co" ||
-    !supabaseServiceKey ||
-    supabaseServiceKey === "placeholder-key"
-  ) {
-    return null;
-  }
-  return createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
+  if (!supabaseUrl || !supabaseServiceKey) return null;
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false },
+  });
 }
 
 /* ================================
@@ -123,6 +125,7 @@ Your job:
 Rules:
 - Only reference 5starweddingdirectory.com and the 5starweddingdirectory.com blog.
 - If you are not sure of an exact venue page, do not invent it. Ask a narrowing question.
+- Use Markdown formatting (bold, lists) for timelines, budgets, and recommendations.
 
 Response format:
 First the natural reply.
@@ -147,9 +150,9 @@ If unknown, set to null.
 /* ================================
    Tool definition shape for OpenAI
 ================================ */
-const tools = [
+const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    type: "function" as const,
+    type: "function",
     function: {
       name: "search_directory",
       description:
@@ -167,6 +170,7 @@ const tools = [
           page: { type: "number" },
           pageSize: { type: "number" },
         },
+        additionalProperties: false,
       },
     },
   },
@@ -174,13 +178,11 @@ const tools = [
 
 /* ================================
    Directory bridge call
-   Uses the server side route we created:
-   src/app/api/directory/search/route.ts
 ================================ */
 async function callDirectoryBridge(reqUrl: string, args: any) {
   const origin = new URL(reqUrl).origin;
   const url = new URL(`${origin}/api/directory/search`);
-  // POST body preferred for complex q
+
   const res = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -193,6 +195,7 @@ async function callDirectoryBridge(reqUrl: string, args: any) {
       pageSize: args?.pageSize ?? 10,
     }),
   });
+
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.ok) {
     throw new Error(`Directory bridge failed ${res.status} ${data?.error || ""}`.trim());
@@ -216,15 +219,14 @@ async function runModelWithTools({
   let chat = await client.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.6,
-    messages: [{ role: "system", content: systemPrompt }, ...messages],
+    messages: [{ role: "system", content: systemPrompt }, ...messages] as any,
     tools,
     tool_choice: "auto",
   });
 
-  // If the model asked to call tools, resolve them here
-  // Support a small loop so it can refine after a tool result
+  // Tool loop
   for (let i = 0; i < 2; i++) {
-    const choice = chat.choices[0];
+    const choice = chat.choices?.[0];
     const toolCalls = choice?.message?.tool_calls;
 
     if (!toolCalls || toolCalls.length === 0) break;
@@ -233,8 +235,9 @@ async function runModelWithTools({
 
     for (const tc of toolCalls) {
       try {
-        if (tc.function?.name === "search_directory") {
-          const args = JSON.parse(tc.function.arguments || "{}");
+        // ✅ FIX: Narrow the union before accessing tc.function
+        if (tc.type === "function" && tc.function?.name === "search_directory") {
+          const args = JSON.parse(tc.function.arguments ?? "{}");
           const result = await callDirectoryBridge(reqUrl, args);
 
           toolMessages.push({
@@ -245,58 +248,58 @@ async function runModelWithTools({
           });
         }
       } catch (err: any) {
-        // Return a safe error payload to the model
         toolMessages.push({
           role: "tool",
-          tool_call_id: tc.id,
+          tool_call_id: (tc as any).id,
           content: JSON.stringify({ ok: false, error: err?.message || "Directory search failed" }),
           name: "search_directory",
         });
       }
     }
 
+    // Second call with tool outputs
     chat = await client.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.6,
       messages: [
         { role: "system", content: systemPrompt },
         ...messages,
-        // The assistant message that requested the tools must be included
-        chat.choices[0].message as any,
+        chat.choices[0].message,
         ...toolMessages,
-      ],
+      ] as any,
       tools,
       tool_choice: "auto",
     });
   }
 
-  const fullContent = chat.choices[0]?.message?.content || "";
-  return fullContent;
+  return chat.choices?.[0]?.message?.content || "";
 }
 
 /* ================================
-   Route
+   Route Handler
 ================================ */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
     const messages: ChatMessage[] = Array.isArray(body.messages) ? body.messages : [];
+
     const chatType: "vendor" | "couple" =
       body.chatType === "vendor" || body.mode === "vendor" ? "vendor" : "couple";
 
     const organisationId: string = body.organisationId || "9ecd45ab-6ed2-46fa-914b-82be313e06e4";
     const agentId: string = body.agentId || "70660422-489c-4b7d-81ae-b786e43050db";
 
-    let conversationId: string | null = typeof body.conversationId === "string" ? body.conversationId : null;
+    let conversationId: string | null =
+      typeof body.conversationId === "string" ? body.conversationId : null;
 
     if (messages.length === 0) {
       return NextResponse.json({ ok: false, error: "No messages supplied" }, { status: 400 });
     }
 
-    if (!apiKey || apiKey.startsWith("dummy")) {
-      console.error("VENDORS CHAT ERROR: OpenAI key missing or invalid.");
-      return NextResponse.json({ ok: false, error: "OPENAI_API_KEY missing or invalid" }, { status: 500 });
+    if (!apiKey) {
+      console.error("VENDORS CHAT ERROR: OpenAI key missing.");
+      return NextResponse.json({ ok: false, error: "OPENAI_API_KEY missing" }, { status: 500 });
     }
 
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
@@ -304,11 +307,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "No user message found" }, { status: 400 });
     }
 
-    // Run model with tools
     const systemPrompt = buildSystemPrompt(chatType);
     const fullContent = await runModelWithTools({ systemPrompt, messages, reqUrl: req.url });
 
-    // Split reply and metadata
+    // Parse metadata
     let replyText = fullContent.trim();
     let metadata: LeadMetadata = {};
 
@@ -329,16 +331,15 @@ export async function POST(req: Request) {
 
     if (!replyText) replyText = fullContent.trim();
 
-    // Defaults for consistency
+    // Defaults
     metadata.source = metadata.source || "web_chat";
     if (chatType === "couple") metadata.business_category = "Couple";
 
-    // Save to Supabase if available
+    // Supabase write
     const supabase = getSupabaseServerClient();
     let leadId: string | null = null;
 
     if (supabase) {
-      // create conversation if missing
       if (!conversationId) {
         const { data: conv, error: convError } = await supabase
           .from("conversations")
@@ -357,13 +358,10 @@ export async function POST(req: Request) {
           .select("id")
           .single();
 
-        if (convError) {
-          console.error("Create conversation error", convError);
-        } else if (conv) {
-          conversationId = conv.id as string;
-        }
+        if (convError) console.error("Create conversation error", convError);
+        else if (conv) conversationId = conv.id as string;
       } else {
-        const { error: convUpdateError } = await supabase
+        await supabase
           .from("conversations")
           .update({
             last_message: replyText,
@@ -373,13 +371,8 @@ export async function POST(req: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", conversationId);
-
-        if (convUpdateError) {
-          console.error("Update conversation error", convUpdateError);
-        }
       }
 
-      // insert lead
       const { data, error } = await supabase
         .from("vendor_leads")
         .insert({
@@ -404,11 +397,8 @@ export async function POST(req: Request) {
         .select()
         .single();
 
-      if (error) {
-        console.error("vendor_leads insert error", error.message);
-      } else if (data) {
-        leadId = data.id as string;
-      }
+      if (error) console.error("vendor_leads insert error", error.message);
+      else if (data) leadId = data.id as string;
     }
 
     return NextResponse.json({
@@ -419,7 +409,10 @@ export async function POST(req: Request) {
       conversation_id: conversationId,
     });
   } catch (err: any) {
-    console.error("VENDORS-CHAT API ERROR:", err);
-    return NextResponse.json({ ok: false, error: err.message || "Unexpected server error" }, { status: 500 });
+    console.error("VENDORS CHAT API ERROR:", err);
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Unexpected server error" },
+      { status: 500 }
+    );
   }
 }

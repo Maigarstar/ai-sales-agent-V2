@@ -12,6 +12,7 @@ export async function POST(req: Request) {
   const sessionConfig = {
     type: "realtime",
     model: "gpt-4o-realtime-preview",
+    output_modalities: ["audio"],
     instructions: `
 IDENTITY:
 You are Aura, the AI Concierge for "5 Star Weddings," a luxury venue and vendor curation brand. You represent the pinnacle of luxury, taste, and exclusivity.
@@ -56,16 +57,11 @@ Good morning. This is Aura from 5 Star Weddings. Are you looking for a specific 
     body: fd,
   });
 
-  if (!r.ok) {
-    const errorText = await r.text();
-    console.error("OpenAI Realtime Error:", r.status, errorText);
-    return new Response(errorText, { status: r.status });
-  }
+  const text = await r.text();
+  if (!r.ok) return new Response(text, { status: r.status });
 
-  const sdpAnswer = await r.text();
-
-  return new Response(sdpAnswer, {
-    status: 200,
+  return new Response(text, {
+    status: 201,
     headers: {
       "Content-Type": "application/sdp",
       ...(r.headers.get("Location") ? { Location: r.headers.get("Location")! } : {}),

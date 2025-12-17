@@ -12,9 +12,8 @@ import VoiceToTextButton from "@/components/VoiceToTextButton";
 const GA4_MEASUREMENT_ID = "G-NXSBQEWCZT";
 const GTM_CONTAINER_ID = "GTM-5QXXSB";
 
-// ProvideSupport sources, cleaned, script only
-const PS_SYNC_SRC =
-  "https://image.providesupport.com/js/00w8xxhihpcie1ionxhh6o20ab/safe-monitor-sync.js?ps_h=WVqI&ps_t=";
+// ProvideSupport sources
+const PS_SYNC_SRC = "https://image.providesupport.com/js/00w8xxhihpcie1ionxhh6o20ab/safe-monitor-sync.js?ps_h=WVqI&ps_t=";
 const PS_STATIC_SRC = "https://image.providesupport.com/sjs/static.js";
 
 let __gaLoaded = false;
@@ -22,6 +21,7 @@ let __gtmLoaded = false;
 let __psLoaded = false;
 
 function injectScript(src: string, place: "head" | "body" = "head") {
+  if (typeof document === 'undefined') return;
   const s = document.createElement("script");
   s.src = src;
   s.async = true;
@@ -29,6 +29,7 @@ function injectScript(src: string, place: "head" | "body" = "head") {
 }
 
 function ensureGtagShim() {
+  if (typeof window === 'undefined') return;
   if (!(window as any).dataLayer) (window as any).dataLayer = [];
   if (!(window as any).gtag) (window as any).gtag = function gtag() { (window as any).dataLayer.push(arguments); };
 }
@@ -52,9 +53,7 @@ function updateConsent(opts: { analytics?: boolean; marketing?: boolean }) {
 function loadGA4() {
   if (__gaLoaded || !GA4_MEASUREMENT_ID) return;
   __gaLoaded = true;
-
   injectScript(`https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}`, "head");
-
   const inline = document.createElement("script");
   inline.innerHTML = `
     window.dataLayer = window.dataLayer || [];
@@ -69,7 +68,6 @@ function loadGA4() {
 function loadGTM() {
   if (__gtmLoaded || !GTM_CONTAINER_ID) return;
   __gtmLoaded = true;
-
   const inline = document.createElement("script");
   inline.innerHTML = `
     (function(w,d,s,l,i){
@@ -83,11 +81,10 @@ function loadGTM() {
   document.head.appendChild(inline);
 }
 
-/* ProvideSupport loader, script only */
+/* ProvideSupport loader */
 function loadProvideSupport() {
   if (__psLoaded) return;
   __psLoaded = true;
-
   const boot = () => {
     injectScript(`${PS_SYNC_SRC}${Date.now()}`, "body");
     injectScript(PS_STATIC_SRC, "body");
@@ -96,7 +93,7 @@ function loadProvideSupport() {
   else window.addEventListener("load", boot, { once: true });
 }
 
-/* Apply stored preferences on mount and subscribe to updates */
+/* Apply stored preferences */
 function useConsentApply() {
   useEffect(() => {
     function applyStored() {
@@ -104,35 +101,18 @@ function useConsentApply() {
         const raw = localStorage.getItem("fsw_cookie_consent");
         if (!raw) return;
         const prefs = JSON.parse(raw) as { analytics?: boolean; marketing?: boolean };
-
-        // Update Consent Mode first
         updateConsent({ analytics: !!prefs.analytics, marketing: !!prefs.marketing });
-
-        // Load tools per consent
-        if (prefs.analytics) {
-          loadGA4();
-          loadGTM();
-        }
-        if (prefs.marketing) {
-          loadProvideSupport();
-        }
+        if (prefs.analytics) { loadGA4(); loadGTM(); }
+        if (prefs.marketing) { loadProvideSupport(); }
       } catch {}
     }
-
     applyStored();
-
     const onUpdate = (e: Event) => {
       const detail = (e as CustomEvent).detail || {};
       updateConsent({ analytics: !!detail.analytics, marketing: !!detail.marketing });
-      if (detail.analytics) {
-        loadGA4();
-        loadGTM();
-      }
-      if (detail.marketing) {
-        loadProvideSupport();
-      }
+      if (detail.analytics) { loadGA4(); loadGTM(); }
+      if (detail.marketing) { loadProvideSupport(); }
     };
-
     document.addEventListener("fsw-consent-updated", onUpdate);
     return () => document.removeEventListener("fsw-consent-updated", onUpdate);
   }, []);
@@ -156,6 +136,57 @@ const COUPLE_PROMPTS = [
   "Suggest a jazz band in London",
   "Spring floral styling ideas",
 ];
+
+/* =========================================================
+   CUSTOM TEXT FORMATTER (Fixed for Numbered Lists)
+   ========================================================= */
+function FormattedMessage({ content }: { content: string }) {
+  // Normalize line breaks
+  const cleanContent = content.replace(/\\n/g, '\n');
+  const lines = cleanContent.split('\n');
+
+  return (
+    <div className="space-y-2">
+      {lines.map((line, i) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={i} className="h-1" />;
+
+        // 1. Detect List Items: Numbers (1.) or Bullets (* / -)
+        const isBullet = trimmed.startsWith("* ") || trimmed.startsWith("- ");
+        const isNumber = /^\d+\.\s/.test(trimmed); // Matches "1. ", "10. ", etc.
+
+        // Clean the text (remove the "1. " or "* ")
+        let displayText = trimmed;
+        if (isBullet) displayText = trimmed.substring(2);
+        if (isNumber) displayText = trimmed.replace(/^\d+\.\s/, "");
+
+        // 2. Parse Bold Text (**bold**)
+        const parts = displayText.split(/(\*\*.*?\*\*)/g).map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={j} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
+          }
+          return part;
+        });
+
+        // 3. Render
+        if (isBullet || isNumber) {
+          return (
+            <div key={i} className="flex items-start">
+              {/* Render Number or Dot */}
+              <span className={`mr-2 mt-1 flex-shrink-0 ${isBullet ? "w-1.5 h-1.5 bg-gray-400 rounded-full mt-2" : "font-bold text-[#1F4D3E] text-xs min-w-[16px]"}`}>
+                {isNumber ? trimmed.match(/^\d+/)?.[0] + "." : ""}
+              </span>
+              <span className="leading-relaxed text-gray-800">{parts}</span>
+            </div>
+          );
+        }
+
+        // Standard Paragraph
+        return <p key={i} className="leading-relaxed text-gray-800">{parts}</p>;
+      })}
+    </div>
+  );
+}
 
 /* =========================================================
    UI Helpers
@@ -207,11 +238,8 @@ function CookiePreferenceCenter({ isOpen, onClose }: CookieModalProps) {
   const handleSave = () => {
     const preferences = { analytics, marketing, timestamp: Date.now() };
     localStorage.setItem("fsw_cookie_consent", JSON.stringify(preferences));
-
-    // Notify listeners, load happens in the hook subscriber
     const evt = new CustomEvent("fsw-consent-updated", { detail: preferences });
     document.dispatchEvent(evt);
-
     onClose();
   };
 
@@ -226,55 +254,43 @@ function CookiePreferenceCenter({ isOpen, onClose }: CookieModalProps) {
             <X size={24} />
           </button>
         </div>
-
         <div className="p-6 overflow-y-auto">
           <p className="text-[14px] text-gray-600 leading-relaxed mb-6">
             We use cookies for essential operations, analytics and marketing measurement. You can change your choices any time.
             {" "}
             <a href="https://5starweddingdirectory.com/privacy" target="_blank" rel="noopener noreferrer" className="underline text-gray-800 hover:text-black">
               Learn more
-            </a>
-            .
+            </a>.
           </p>
-
           <div className="space-y-6">
             <div className="flex items-start justify-between">
               <div className="pr-4">
-                <div className="font-medium text-gray-900 text-[15px] mb-1">Strictly Necessary Cookies, always active</div>
+                <div className="font-medium text-gray-900 text-[15px] mb-1">Strictly Necessary Cookies</div>
                 <div className="text-[13px] text-gray-500">Security, authentication, performance</div>
               </div>
               <Toggle checked={true} disabled />
             </div>
-
             <div className="h-px bg-gray-100 w-full" />
-
             <div className="flex items-start justify-between">
               <div className="pr-4">
                 <div className="font-medium text-gray-900 text-[15px] mb-1">Analytics Cookies</div>
-                <div className="text-[13px] text-gray-500">Helps us understand traffic and improve the experience</div>
+                <div className="text-[13px] text-gray-500">Traffic and improvement</div>
               </div>
               <Toggle checked={analytics} onChange={setAnalytics} />
             </div>
-
             <div className="h-px bg-gray-100 w-full" />
-
             <div className="flex items-start justify-between">
               <div className="pr-4">
                 <div className="font-medium text-gray-900 text-[15px] mb-1">Marketing Performance Cookies</div>
-                <div className="text-[13px] text-gray-500">Measures effectiveness of campaigns and live support</div>
+                <div className="text-[13px] text-gray-500">Campaign effectiveness</div>
               </div>
               <Toggle checked={marketing} onChange={setMarketing} />
             </div>
           </div>
         </div>
-
         <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-gray-600 text-sm font-medium hover:text-gray-900">
-            Cancel
-          </button>
-          <button onClick={handleSave} className="px-6 py-2 bg-[#1F4D3E] text-white rounded-lg text-sm font-medium hover:bg-[#163C30] shadow-sm">
-            Confirm My Choices
-          </button>
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 text-sm font-medium hover:text-gray-900">Cancel</button>
+          <button onClick={handleSave} className="px-6 py-2 bg-[#1F4D3E] text-white rounded-lg text-sm font-medium hover:bg-[#163C30] shadow-sm">Confirm My Choices</button>
         </div>
       </div>
     </div>
@@ -291,14 +307,11 @@ function BrandFooter({ onOpenCookies }: { onOpenCookies: () => void }) {
       <div className="flex flex-wrap justify-center items-center gap-1 opacity-80">
         <span>Powered by Taigenic.ai</span>
         <span className="hidden sm:inline">•</span>
-        <span>5 Star Weddings Ltd. 2006,{year}</span>
+        <span>5 Star Weddings Ltd. 2006-{year}</span>
         <span className="hidden sm:inline">•</span>
         <span className="inline-flex gap-1">
           See{" "}
-          <button
-            onClick={onOpenCookies}
-            className="underline decoration-gray-400 hover:text-gray-800 hover:decoration-gray-600"
-          >
+          <button onClick={onOpenCookies} className="underline decoration-gray-400 hover:text-gray-800 hover:decoration-gray-600">
             Cookie Preferences
           </button>.
         </span>
@@ -316,7 +329,6 @@ export default function VendorsChatInner() {
   useConsentApply();
 
   const searchParams = useSearchParams();
-
   const isEmbed = searchParams.get("embed") === "1";
   const initialChatType = searchParams.get("chatType") === "couple" ? "couple" : "vendor";
   const organisationId = searchParams.get("organisationId") || "9ecd45ab-6ed2-46fa-914b-82be313e06e4";
@@ -325,9 +337,7 @@ export default function VendorsChatInner() {
   const [view, setView] = useState<"form" | "chat">("form");
   const [mode, setMode] = useState<"vendor" | "couple">(initialChatType);
   const [conversationId, setConversationId] = useState<string | null>(null);
-
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
-
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -348,6 +358,14 @@ export default function VendorsChatInner() {
 
   const isVendor = mode === "vendor";
 
+  // Check cookie on mount to see if we need to open the modal (ChatGPT style)
+  useEffect(() => {
+    const raw = localStorage.getItem("fsw_cookie_consent");
+    if (!raw && !isEmbed) {
+      setIsCookieModalOpen(true);
+    }
+  }, [isEmbed]);
+
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading, view]);
@@ -357,7 +375,7 @@ export default function VendorsChatInner() {
     if (!el) return;
     el.style.height = "auto";
     const next = Math.min(el.scrollHeight, 180);
-    el.style.height = \`\${next}px\`;
+    el.style.height = `${next}px`;
   }, [input]);
 
   const handleStartChat = async (e: React.FormEvent) => {
@@ -435,7 +453,7 @@ export default function VendorsChatInner() {
         setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
       }
     } catch {
-      // silent
+      // silent error
     } finally {
       setLoading(false);
     }
@@ -468,7 +486,7 @@ export default function VendorsChatInner() {
 
   if (view === "form") {
     return (
-      <div className={\`min-h-screen flex flex-col bg-gray-50/50 \${isEmbed ? "py-0" : "py-12 sm:px-6 lg:px-8"}\`}>
+      <div className={`min-h-screen flex flex-col bg-gray-50/50 ${isEmbed ? "py-0" : "py-12 sm:px-6 lg:px-8"}`}>
         <div className="flex-1 flex flex-col justify-center items-center">
           <div className="sm:mx-auto sm:w-full sm:max-w-md text-center px-4 mb-8">
             <h1 className="text-[#1F4D3E]" style={{ fontFamily: "var(--font-gilda-display), serif", fontSize: 48, lineHeight: "1.1em" }}>
@@ -482,26 +500,20 @@ export default function VendorsChatInner() {
 
           <div className="flex justify-center mb-8">
             <div className="bg-white p-1.5 rounded-full border border-gray-200 shadow-sm inline-flex">
-              <button
-                onClick={() => setMode("vendor")}
-                className={\`px-6 py-2 rounded-full text-sm font-medium transition-all \${mode === "vendor" ? "bg-[#1F4D3E] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}\`}
-              >
+              <button onClick={() => setMode("vendor")} className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${mode === "vendor" ? "bg-[#1F4D3E] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
                 I am a Vendor
               </button>
-              <button
-                onClick={() => setMode("couple")}
-                className={\`px-6 py-2 rounded-full text-sm font-medium transition-all \${mode === "couple" ? "bg-[#1F4D3E] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}\`}
-              >
+              <button onClick={() => setMode("couple")} className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${mode === "couple" ? "bg-[#1F4D3E] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
                 I am a Couple
               </button>
             </div>
           </div>
 
           <div className="sm:mx-auto sm:w-full sm:max-w-[500px]">
-            <div className={\`bg-white shadow-xl shadow-gray-200/50 rounded-2xl border border-gray-100 \${isEmbed ? "p-6" : "p-8 sm:p-10"}\`}>
+            <div className={`bg-white shadow-xl shadow-gray-200/50 rounded-2xl border border-gray-100 ${isEmbed ? "p-6" : "p-8 sm:p-10"}`}>
               <form className="space-y-5" onSubmit={handleStartChat}>
                 {formError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">{formError}</div>}
-
+                
                 <div className="space-y-1">
                   <label className="block text-[15px] font-medium text-gray-700 ml-1">Name</label>
                   <input required type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]" />
@@ -565,12 +577,17 @@ export default function VendorsChatInner() {
       <div className="flex-1 overflow-hidden relative w-full max-w-3xl mx-auto sm:px-4 sm:pb-4">
         <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-6 scroll-smooth pb-24 sm:pb-4">
           {messages.map((m, i) => (
-            <div key={i} className={`flex w-full ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div key={i} className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && (
                 <div className="w-8 h-8 rounded-full bg-[#1F4D3E] flex items-center justify-center text-white text-xs mr-2 flex-shrink-0 mt-2 font-serif">5*</div>
               )}
               <div className={`max-w-[85%] sm:max-w-[75%] px-6 py-4 text-[15px] sm:text-base leading-relaxed shadow-sm ${m.role === "user" ? "bg-[#1F4D3E] text-white rounded-2xl rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-bl-sm"}`}>
-                {m.content}
+                {/* USE THE CUSTOM FORMATTER HERE */}
+                {m.role === "user" ? (
+                  m.content
+                ) : (
+                  <FormattedMessage content={m.content} />
+                )}
               </div>
             </div>
           ))}
@@ -591,7 +608,7 @@ export default function VendorsChatInner() {
       <div className="bg-white border-t border-gray-100 p-4 w-full z-20">
         <div className="max-w-3xl mx-auto">
           {!loading && (
-            <div className="flex gap-2 overflow-x-auto pb-3 mb-2">
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-2 mask-linear">
               {(isVendor ? VENDOR_PROMPTS : COUPLE_PROMPTS).map((prompt, i) => (
                 <button
                   key={i}
@@ -617,7 +634,7 @@ export default function VendorsChatInner() {
               style={{ minHeight: "50px", maxHeight: "180px" }}
             />
             <div className="absolute right-2 bottom-1.5 flex items-center gap-2">
-              <VoiceToTextButton onText={(t) => setInput((prev) => (prev ? \`\${prev} \${t}\` : t))} />
+              <VoiceToTextButton onText={(t) => setInput((prev) => (prev ? `${prev} ${t}` : t))} />
               <AuraVoice />
               <button onClick={() => handleSend()} disabled={loading || !input.trim()} className="h-10 w-10 rounded-full flex items-center justify-center bg-[#1F4D3E] text-white shadow-md hover:bg-[#163C30] disabled:opacity-40">
                 <Send size={16} />

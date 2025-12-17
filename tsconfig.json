@@ -48,9 +48,9 @@
     "**/*.mts",
     "app/vendors-chat-bin/page.tsx-bin",
     "tailwind.config.js",
-    "app/lib/supabaseClient.js",
+    "app/lib/supabaseClient.ts",
     "app/api/admin/vendor-applications/[id]/route.ts--old"
-  ],
+, "app/api/directory/search/DEMO-route", "next.config.mjs", "lib/directory-TO=BE-TS"  ],
 
   "exclude": ["node_modules"]
 }

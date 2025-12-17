@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Send, Trash2, X, Sparkles } from "lucide-react";
+import { 
+  Send, Trash2, X, Sparkles, UserPlus, CheckCircle, 
+  Lock, Mail, ArrowLeft, LogIn, User, Store 
+} from "lucide-react";
 import AuraVoice from "@/components/AuraVoice";
 import VoiceToTextButton from "@/components/VoiceToTextButton";
 
 /* =========================================================
-   IDs and Loaders
+   IDS and LOADERS
    ========================================================= */
 const GA4_MEASUREMENT_ID = "G-NXSBQEWCZT";
 const GTM_CONTAINER_ID = "GTM-5QXXSB";
@@ -15,6 +18,8 @@ const GTM_CONTAINER_ID = "GTM-5QXXSB";
 // ProvideSupport sources
 const PS_SYNC_SRC = "https://image.providesupport.com/js/00w8xxhihpcie1ionxhh6o20ab/safe-monitor-sync.js?ps_h=WVqI&ps_t=";
 const PS_STATIC_SRC = "https://image.providesupport.com/sjs/static.js";
+const STORAGE_KEY_CHAT = "fsw_chat_session_v1";
+const STORAGE_KEY_COOKIE = "fsw_cookie_consent";
 
 let __gaLoaded = false;
 let __gtmLoaded = false;
@@ -49,7 +54,7 @@ function updateConsent(opts: { analytics?: boolean; marketing?: boolean }) {
   } catch {}
 }
 
-/* GA4 loader */
+/* Loaders */
 function loadGA4() {
   if (__gaLoaded || !GA4_MEASUREMENT_ID) return;
   __gaLoaded = true;
@@ -64,7 +69,6 @@ function loadGA4() {
   document.head.appendChild(inline);
 }
 
-/* GTM loader */
 function loadGTM() {
   if (__gtmLoaded || !GTM_CONTAINER_ID) return;
   __gtmLoaded = true;
@@ -81,7 +85,6 @@ function loadGTM() {
   document.head.appendChild(inline);
 }
 
-/* ProvideSupport loader */
 function loadProvideSupport() {
   if (__psLoaded) return;
   __psLoaded = true;
@@ -93,12 +96,11 @@ function loadProvideSupport() {
   else window.addEventListener("load", boot, { once: true });
 }
 
-/* Apply stored preferences */
 function useConsentApply() {
   useEffect(() => {
     function applyStored() {
       try {
-        const raw = localStorage.getItem("fsw_cookie_consent");
+        const raw = localStorage.getItem(STORAGE_KEY_COOKIE);
         if (!raw) return;
         const prefs = JSON.parse(raw) as { analytics?: boolean; marketing?: boolean };
         updateConsent({ analytics: !!prefs.analytics, marketing: !!prefs.marketing });
@@ -119,7 +121,7 @@ function useConsentApply() {
 }
 
 /* =========================================================
-   Starter Chips
+   STARTER CHIPS
    ========================================================= */
 const VENDOR_PROMPTS = [
   "How can I improve my SEO?",
@@ -138,10 +140,9 @@ const COUPLE_PROMPTS = [
 ];
 
 /* =========================================================
-   CUSTOM TEXT FORMATTER (Fixed for Numbered Lists)
+   CUSTOM TEXT FORMATTER
    ========================================================= */
 function FormattedMessage({ content }: { content: string }) {
-  // Normalize line breaks
   const cleanContent = content.replace(/\\n/g, '\n');
   const lines = cleanContent.split('\n');
 
@@ -151,16 +152,22 @@ function FormattedMessage({ content }: { content: string }) {
         const trimmed = line.trim();
         if (!trimmed) return <div key={i} className="h-1" />;
 
-        // 1. Detect List Items: Numbers (1.) or Bullets (* / -)
-        const isBullet = trimmed.startsWith("* ") || trimmed.startsWith("- ");
-        const isNumber = /^\d+\.\s/.test(trimmed); // Matches "1. ", "10. ", etc.
+        // 1. Detect Headings
+        const isH3 = trimmed.startsWith("### ");
+        const isH4 = trimmed.startsWith("#### ");
 
-        // Clean the text (remove the "1. " or "* ")
+        if (isH3) return <h3 key={i} className="text-lg font-bold text-[#1F4D3E] mt-3 mb-1">{trimmed.substring(4)}</h3>;
+        if (isH4) return <h4 key={i} className="text-md font-bold text-gray-900 mt-2 mb-1">{trimmed.substring(5)}</h4>;
+
+        // 2. Detect Lists
+        const isBullet = trimmed.startsWith("* ") || trimmed.startsWith("- ");
+        const isNumber = /^\d+\.\s/.test(trimmed); 
+
         let displayText = trimmed;
         if (isBullet) displayText = trimmed.substring(2);
         if (isNumber) displayText = trimmed.replace(/^\d+\.\s/, "");
 
-        // 2. Parse Bold Text (**bold**)
+        // 3. Parse Bold
         const parts = displayText.split(/(\*\*.*?\*\*)/g).map((part, j) => {
           if (part.startsWith('**') && part.endsWith('**')) {
             return <strong key={j} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
@@ -168,11 +175,10 @@ function FormattedMessage({ content }: { content: string }) {
           return part;
         });
 
-        // 3. Render
+        // 4. Render
         if (isBullet || isNumber) {
           return (
             <div key={i} className="flex items-start">
-              {/* Render Number or Dot */}
               <span className={`mr-2 mt-1 flex-shrink-0 ${isBullet ? "w-1.5 h-1.5 bg-gray-400 rounded-full mt-2" : "font-bold text-[#1F4D3E] text-xs min-w-[16px]"}`}>
                 {isNumber ? trimmed.match(/^\d+/)?.[0] + "." : ""}
               </span>
@@ -181,7 +187,6 @@ function FormattedMessage({ content }: { content: string }) {
           );
         }
 
-        // Standard Paragraph
         return <p key={i} className="leading-relaxed text-gray-800">{parts}</p>;
       })}
     </div>
@@ -215,17 +220,15 @@ function Toggle({ checked, onChange, disabled = false }: ToggleProps) {
 }
 
 /* =========================================================
-   Cookie Preference Center Modal
+   MODALS: Cookie & Auth Suite
    ========================================================= */
-type CookieModalProps = { isOpen: boolean; onClose: () => void };
-
-function CookiePreferenceCenter({ isOpen, onClose }: CookieModalProps) {
+function CookiePreferenceCenter({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    const saved = localStorage.getItem("fsw_cookie_consent");
+    const saved = localStorage.getItem(STORAGE_KEY_COOKIE);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -237,7 +240,7 @@ function CookiePreferenceCenter({ isOpen, onClose }: CookieModalProps) {
 
   const handleSave = () => {
     const preferences = { analytics, marketing, timestamp: Date.now() };
-    localStorage.setItem("fsw_cookie_consent", JSON.stringify(preferences));
+    localStorage.setItem(STORAGE_KEY_COOKIE, JSON.stringify(preferences));
     const evt = new CustomEvent("fsw-consent-updated", { detail: preferences });
     document.dispatchEvent(evt);
     onClose();
@@ -297,6 +300,215 @@ function CookiePreferenceCenter({ isOpen, onClose }: CookieModalProps) {
   );
 }
 
+/* --- FULL AUTH MODAL (Couple/Vendor, Login/Register/Forgot) --- */
+function AuthModal({ 
+  isOpen, 
+  onClose, 
+  initialMode, 
+  onSuccess 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  initialMode: "vendor" | "couple";
+  onSuccess: (name: string, email: string) => void;
+}) {
+  const [view, setView] = useState<"register" | "login" | "forgot">("register");
+  const [role, setRole] = useState<"vendor" | "couple">(initialMode);
+  
+  // Form States
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setRole(initialMode);
+      setView("register");
+      setSuccessMsg("");
+      setName("");
+      setEmail("");
+      setPassword("");
+    }
+  }, [isOpen, initialMode]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    // Simulate API delay
+    setTimeout(() => {
+      setLoading(false);
+      
+      if (view === "forgot") {
+        setSuccessMsg(`Reset link sent to ${email}`);
+        setTimeout(() => {
+          setView("login");
+          setSuccessMsg("");
+        }, 3000);
+      } else {
+        // Login or Register success
+        onSuccess(name || "User", email);
+        setSuccessMsg("Success!");
+        setTimeout(() => {
+          onClose();
+        }, 1000);
+      }
+    }, 1500);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] relative overflow-hidden flex flex-col">
+        
+        {/* CLOSE BUTTON */}
+        <button onClick={onClose} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 z-10"><X size={20}/></button>
+
+        {/* HEADER & ROLE SWITCHER */}
+        <div className="px-8 pt-8 pb-4">
+          <h2 className="text-2xl font-serif text-[#1F4D3E] mb-1 text-center">
+            {view === "register" && "Create Account"}
+            {view === "login" && "Welcome Back"}
+            {view === "forgot" && "Reset Password"}
+          </h2>
+          <p className="text-gray-500 text-sm text-center mb-6">
+            {view === "register" && "Save your chat, timeline & shortlist."}
+            {view === "login" && "Access your saved wedding plans."}
+            {view === "forgot" && "We'll send you a recovery link."}
+          </p>
+
+          {/* ROLE TABS (Only show if not forgot pass) */}
+          {view !== "forgot" && (
+            <div className="bg-gray-100 p-1 rounded-lg flex mb-4">
+              <button 
+                onClick={() => setRole("couple")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${role === "couple" ? "bg-white text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <User size={16} /> Couple
+              </button>
+              <button 
+                onClick={() => setRole("vendor")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${role === "vendor" ? "bg-white text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                <Store size={16} /> Vendor
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* SUCCESS OVERLAY */}
+        {successMsg && (
+          <div className="absolute inset-0 bg-white/90 z-20 flex flex-col items-center justify-center animate-in fade-in">
+            <CheckCircle size={48} className="text-green-600 mb-4" />
+            <p className="text-lg font-medium text-gray-900">{successMsg}</p>
+          </div>
+        )}
+
+        {/* FORM */}
+        <form onSubmit={handleSubmit} className="px-8 pb-8 flex-1 flex flex-col gap-4">
+          
+          {/* REGISTER EXTRA FIELD: NAME */}
+          {view === "register" && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Full Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                <input 
+                  type="text" 
+                  required 
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Your Name"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* EMAIL */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-2.5 text-gray-400" size={18} />
+              <input 
+                type="email" 
+                required 
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          {/* PASSWORD (Hidden on forgot) */}
+          {view !== "forgot" && (
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Password</label>
+                {view === "login" && (
+                  <button type="button" onClick={() => setView("forgot")} className="text-xs text-[#1F4D3E] hover:underline">
+                    Forgot?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                <input 
+                  type="password" 
+                  required 
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-3 bg-[#1F4D3E] text-white rounded-lg font-medium hover:bg-[#163C30] transition-all disabled:opacity-70 mt-2 shadow-sm flex items-center justify-center gap-2"
+          >
+            {loading ? "Processing..." : (
+              <>
+                {view === "register" ? "Create Account" : view === "login" ? "Log In" : "Send Reset Link"}
+                {view !== "forgot" && <ArrowLeft className="rotate-180" size={16} />}
+              </>
+            )}
+          </button>
+
+          {/* FOOTER LINKS */}
+          <div className="mt-2 text-center">
+            {view === "register" && (
+              <p className="text-sm text-gray-600">
+                Already have an account?{" "}
+                <button type="button" onClick={() => setView("login")} className="text-[#1F4D3E] font-medium hover:underline">Log in</button>
+              </p>
+            )}
+            {view === "login" && (
+              <p className="text-sm text-gray-600">
+                New here?{" "}
+                <button type="button" onClick={() => setView("register")} className="text-[#1F4D3E] font-medium hover:underline">Create account</button>
+              </p>
+            )}
+            {view === "forgot" && (
+              <button type="button" onClick={() => setView("login")} className="text-sm text-gray-500 hover:text-gray-800 flex items-center justify-center gap-1 mx-auto">
+                <ArrowLeft size={14} /> Back to Log In
+              </button>
+            )}
+          </div>
+
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* =========================================================
    Footer
    ========================================================= */
@@ -337,7 +549,11 @@ export default function VendorsChatInner() {
   const [view, setView] = useState<"form" | "chat">("form");
   const [mode, setMode] = useState<"vendor" | "couple">(initialChatType);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  
+  // Modals
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -355,15 +571,46 @@ export default function VendorsChatInner() {
   });
   const [formError, setFormError] = useState("");
   const [isStarting, setIsStarting] = useState(false);
+  const [isRestored, setIsRestored] = useState(false);
 
   const isVendor = mode === "vendor";
 
-  // Check cookie on mount to see if we need to open the modal (ChatGPT style)
+  // --- RESTORE SESSION ---
   useEffect(() => {
-    const raw = localStorage.getItem("fsw_cookie_consent");
-    if (!raw && !isEmbed) {
-      setIsCookieModalOpen(true);
+    const restoreSession = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_CHAT);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.conversationId && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+            setConversationId(parsed.conversationId);
+            setMessages(parsed.messages);
+            setView("chat");
+            setMode(parsed.mode || initialChatType);
+            if (parsed.formData) setFormData(parsed.formData);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to restore chat session", err);
+      } finally {
+        setIsRestored(true);
+      }
+    };
+    restoreSession();
+  }, [initialChatType]);
+
+  // --- SAVE SESSION ---
+  useEffect(() => {
+    if (view === "chat" && conversationId && messages.length > 0) {
+      const sessionData = { conversationId, messages, mode, formData, timestamp: Date.now() };
+      localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(sessionData));
     }
+  }, [conversationId, messages, view, mode, formData]);
+
+  useEffect(() => {
+    if (isEmbed) return;
+    const raw = localStorage.getItem(STORAGE_KEY_COOKIE);
+    if (!raw) setIsCookieModalOpen(true);
   }, [isEmbed]);
 
   useEffect(() => {
@@ -371,11 +618,10 @@ export default function VendorsChatInner() {
   }, [messages, loading, view]);
 
   useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    const next = Math.min(el.scrollHeight, 180);
-    el.style.height = `${next}px`;
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+    }
   }, [input]);
 
   const handleStartChat = async (e: React.FormEvent) => {
@@ -453,7 +699,7 @@ export default function VendorsChatInner() {
         setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
       }
     } catch {
-      // silent error
+      // silent
     } finally {
       setLoading(false);
     }
@@ -468,6 +714,7 @@ export default function VendorsChatInner() {
 
   const handleDeleteConversation = async () => {
     if (!confirm("Are you sure you want to end this chat?")) return;
+    localStorage.removeItem(STORAGE_KEY_CHAT);
     if (conversationId) {
       await fetch("/api/vendor/delete-conversation", {
         method: "POST",
@@ -482,7 +729,11 @@ export default function VendorsChatInner() {
     setFormData({ name: "", email: "", phone: "", venueOrLocation: "", website: "", weddingDate: "" });
   };
 
-  /* ---------------- Render ---------------- */
+  const handleAuthSuccess = (name: string, email: string) => {
+    setFormData(prev => ({ ...prev, name, email }));
+  };
+
+  if (!isRestored) return null;
 
   if (view === "form") {
     return (
@@ -568,9 +819,23 @@ export default function VendorsChatInner() {
             <h1 className="text-[#1F4D3E]" style={{ fontFamily: "var(--font-gilda-display), serif", fontSize: 28, lineHeight: 1 }}>5 Star Weddings</h1>
             <h2 className="text-[#1F4D3E] opacity-90" style={{ fontFamily: "var(--font-gilda-display), serif", fontSize: 20 }}>Concierge</h2>
           </div>
-          <button onClick={handleDeleteConversation} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full p-2" title="End Chat">
-            <Trash2 size={18} />
-          </button>
+          
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <button 
+              onClick={() => setIsAuthModalOpen(true)} 
+              className="text-gray-400 hover:text-[#1F4D3E] hover:bg-green-50 rounded-full p-2 transition-all" 
+              title="Sign In / Register"
+            >
+              <UserPlus size={18} />
+            </button>
+            <button 
+              onClick={handleDeleteConversation} 
+              className="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full p-2 transition-all" 
+              title="End Chat"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -646,6 +911,12 @@ export default function VendorsChatInner() {
 
       <BrandFooter onOpenCookies={() => setIsCookieModalOpen(true)} />
       <CookiePreferenceCenter isOpen={isCookieModalOpen} onClose={() => setIsCookieModalOpen(false)} />
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        initialMode={mode}
+        onSuccess={handleAuthSuccess} 
+      />
     </div>
   );
 }

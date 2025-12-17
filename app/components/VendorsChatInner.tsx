@@ -7,10 +7,12 @@ import AuraVoice from "@/components/AuraVoice";
 import VoiceToTextButton from "@/components/VoiceToTextButton";
 
 /* =========================================================
-   IDs and Loaders
+   CONSTANTS & CONFIG
    ========================================================= */
 const GA4_MEASUREMENT_ID = "G-NXSBQEWCZT";
 const GTM_CONTAINER_ID = "GTM-5QXXSB";
+const STORAGE_KEY_CHAT = "fsw_chat_session_v1"; // Key to persist chat
+const STORAGE_KEY_COOKIE = "fsw_cookie_consent";
 
 // ProvideSupport sources
 const PS_SYNC_SRC = "https://image.providesupport.com/js/00w8xxhihpcie1ionxhh6o20ab/safe-monitor-sync.js?ps_h=WVqI&ps_t=";
@@ -20,6 +22,9 @@ let __gaLoaded = false;
 let __gtmLoaded = false;
 let __psLoaded = false;
 
+/* =========================================================
+   Loaders & Scripts
+   ========================================================= */
 function injectScript(src: string, place: "head" | "body" = "head") {
   if (typeof document === 'undefined') return;
   const s = document.createElement("script");
@@ -49,7 +54,6 @@ function updateConsent(opts: { analytics?: boolean; marketing?: boolean }) {
   } catch {}
 }
 
-/* GA4 loader */
 function loadGA4() {
   if (__gaLoaded || !GA4_MEASUREMENT_ID) return;
   __gaLoaded = true;
@@ -64,7 +68,6 @@ function loadGA4() {
   document.head.appendChild(inline);
 }
 
-/* GTM loader */
 function loadGTM() {
   if (__gtmLoaded || !GTM_CONTAINER_ID) return;
   __gtmLoaded = true;
@@ -81,7 +84,6 @@ function loadGTM() {
   document.head.appendChild(inline);
 }
 
-/* ProvideSupport loader */
 function loadProvideSupport() {
   if (__psLoaded) return;
   __psLoaded = true;
@@ -93,12 +95,11 @@ function loadProvideSupport() {
   else window.addEventListener("load", boot, { once: true });
 }
 
-/* Apply stored preferences */
 function useConsentApply() {
   useEffect(() => {
     function applyStored() {
       try {
-        const raw = localStorage.getItem("fsw_cookie_consent");
+        const raw = localStorage.getItem(STORAGE_KEY_COOKIE);
         if (!raw) return;
         const prefs = JSON.parse(raw) as { analytics?: boolean; marketing?: boolean };
         updateConsent({ analytics: !!prefs.analytics, marketing: !!prefs.marketing });
@@ -138,10 +139,9 @@ const COUPLE_PROMPTS = [
 ];
 
 /* =========================================================
-   CUSTOM TEXT FORMATTER (Fixed for Numbered Lists)
+   CUSTOM TEXT FORMATTER
    ========================================================= */
 function FormattedMessage({ content }: { content: string }) {
-  // Normalize line breaks
   const cleanContent = content.replace(/\\n/g, '\n');
   const lines = cleanContent.split('\n');
 
@@ -153,9 +153,9 @@ function FormattedMessage({ content }: { content: string }) {
 
         // 1. Detect List Items: Numbers (1.) or Bullets (* / -)
         const isBullet = trimmed.startsWith("* ") || trimmed.startsWith("- ");
-        const isNumber = /^\d+\.\s/.test(trimmed); // Matches "1. ", "10. ", etc.
+        const isNumber = /^\d+\.\s/.test(trimmed); 
 
-        // Clean the text (remove the "1. " or "* ")
+        // Clean the text 
         let displayText = trimmed;
         if (isBullet) displayText = trimmed.substring(2);
         if (isNumber) displayText = trimmed.replace(/^\d+\.\s/, "");
@@ -172,7 +172,6 @@ function FormattedMessage({ content }: { content: string }) {
         if (isBullet || isNumber) {
           return (
             <div key={i} className="flex items-start">
-              {/* Render Number or Dot */}
               <span className={`mr-2 mt-1 flex-shrink-0 ${isBullet ? "w-1.5 h-1.5 bg-gray-400 rounded-full mt-2" : "font-bold text-[#1F4D3E] text-xs min-w-[16px]"}`}>
                 {isNumber ? trimmed.match(/^\d+/)?.[0] + "." : ""}
               </span>
@@ -180,8 +179,6 @@ function FormattedMessage({ content }: { content: string }) {
             </div>
           );
         }
-
-        // Standard Paragraph
         return <p key={i} className="leading-relaxed text-gray-800">{parts}</p>;
       })}
     </div>
@@ -225,7 +222,7 @@ function CookiePreferenceCenter({ isOpen, onClose }: CookieModalProps) {
 
   useEffect(() => {
     if (!isOpen) return;
-    const saved = localStorage.getItem("fsw_cookie_consent");
+    const saved = localStorage.getItem(STORAGE_KEY_COOKIE);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -237,7 +234,7 @@ function CookiePreferenceCenter({ isOpen, onClose }: CookieModalProps) {
 
   const handleSave = () => {
     const preferences = { analytics, marketing, timestamp: Date.now() };
-    localStorage.setItem("fsw_cookie_consent", JSON.stringify(preferences));
+    localStorage.setItem(STORAGE_KEY_COOKIE, JSON.stringify(preferences));
     const evt = new CustomEvent("fsw-consent-updated", { detail: preferences });
     document.dispatchEvent(evt);
     onClose();
@@ -297,9 +294,6 @@ function CookiePreferenceCenter({ isOpen, onClose }: CookieModalProps) {
   );
 }
 
-/* =========================================================
-   Footer
-   ========================================================= */
 function BrandFooter({ onOpenCookies }: { onOpenCookies: () => void }) {
   const year = new Date().getFullYear();
   return (
@@ -355,13 +349,54 @@ export default function VendorsChatInner() {
   });
   const [formError, setFormError] = useState("");
   const [isStarting, setIsStarting] = useState(false);
+  const [isRestored, setIsRestored] = useState(false); // To avoid flickering
 
   const isVendor = mode === "vendor";
 
+  // --- RESTORE SESSION ON MOUNT ---
+  useEffect(() => {
+    const restoreSession = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_CHAT);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Simple validation: must have conversationId and messages
+          if (parsed.conversationId && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+            setConversationId(parsed.conversationId);
+            setMessages(parsed.messages);
+            setView("chat");
+            setMode(parsed.mode || initialChatType);
+            if (parsed.formData) setFormData(parsed.formData);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to restore chat session", err);
+      } finally {
+        setIsRestored(true);
+      }
+    };
+    restoreSession();
+  }, [initialChatType]);
+
+  // --- SAVE SESSION ON CHANGE ---
+  useEffect(() => {
+    if (view === "chat" && conversationId && messages.length > 0) {
+      const sessionData = {
+        conversationId,
+        messages,
+        mode,
+        formData,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(sessionData));
+    }
+  }, [conversationId, messages, view, mode, formData]);
+
   // Check cookie on mount to see if we need to open the modal (ChatGPT style)
   useEffect(() => {
-    const raw = localStorage.getItem("fsw_cookie_consent");
-    if (!raw && !isEmbed) {
+    if (isEmbed) return;
+    const raw = localStorage.getItem(STORAGE_KEY_COOKIE);
+    if (!raw) {
       setIsCookieModalOpen(true);
     }
   }, [isEmbed]);
@@ -468,6 +503,10 @@ export default function VendorsChatInner() {
 
   const handleDeleteConversation = async () => {
     if (!confirm("Are you sure you want to end this chat?")) return;
+    
+    // Clear Local Storage
+    localStorage.removeItem(STORAGE_KEY_CHAT);
+
     if (conversationId) {
       await fetch("/api/vendor/delete-conversation", {
         method: "POST",
@@ -483,6 +522,9 @@ export default function VendorsChatInner() {
   };
 
   /* ---------------- Render ---------------- */
+
+  // Wait for restore check to finish to avoid "Form" flashing if chat exists
+  if (!isRestored) return null; // Or a loading spinner if preferred
 
   if (view === "form") {
     return (

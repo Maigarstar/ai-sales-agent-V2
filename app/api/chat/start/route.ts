@@ -32,7 +32,10 @@ export async function POST(req: Request) {
     const contact_email = clean(body.contact_email);
     const contact_phone = clean(body.contact_phone);
     const contact_company = clean(body.contact_company);
-    const website = clean(body.website);
+
+    // Keep reading website from the client if you want, but do not insert it
+    // until the column exists in Supabase.
+    // const website = clean(body.website);
 
     if (!contact_name && !contact_email && !contact_phone) {
       return NextResponse.json(
@@ -55,13 +58,15 @@ export async function POST(req: Request) {
       contact_email,
       contact_phone,
       contact_company,
-      website,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ ok: true, conversationId }, { status: 200 });

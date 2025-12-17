@@ -10,13 +10,11 @@ export default function AuraVoice() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [status, setStatus] = useState<Status>("idle");
-  const [note, setNote] = useState("");
 
   async function start() {
     if (status !== "idle") return;
 
     setStatus("connecting");
-    setNote("Allow microphone access, connecting.");
 
     try {
       const pc = new RTCPeerConnection();
@@ -31,14 +29,9 @@ export default function AuraVoice() {
       };
 
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "connected") {
-          setStatus("live");
-          setNote("Voice connected.");
-        }
-        if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+        if (pc.connectionState === "connected") setStatus("live");
+        if (pc.connectionState === "failed" || pc.connectionState === "disconnected")
           setStatus("error");
-          setNote("Voice disconnected, start again.");
-        }
       };
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -64,10 +57,9 @@ export default function AuraVoice() {
       });
 
       await pc.setRemoteDescription({ type: "answer", sdp: sdpAnswer });
-    } catch (e: any) {
+    } catch {
       stop();
       setStatus("error");
-      setNote(e?.message ? String(e.message) : "Voice failed.");
     }
   }
 
@@ -81,30 +73,34 @@ export default function AuraVoice() {
     if (audioRef.current) audioRef.current.srcObject = null;
 
     setStatus("idle");
-    setNote("Voice ended.");
   }
 
+  const live = status === "live";
+  const connecting = status === "connecting";
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={start}
-          disabled={status === "connecting" || status === "live"}
-          className="px-4 py-2 rounded-2xl border"
-        >
-          {status === "connecting" ? "Connecting" : status === "live" ? "Live" : "Start voice"}
-        </button>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={start}
+        disabled={connecting || live}
+        className={`px-3 py-2 rounded-xl border text-sm shadow-sm transition-colors ${
+          live ? "bg-green-50 border-green-200 text-green-800" : "bg-white border-gray-200 text-gray-700"
+        } ${connecting ? "opacity-60" : ""}`}
+        title="Start voice"
+      >
+        {connecting ? "Voice..." : live ? "Live" : "Voice"}
+      </button>
 
-        <button
-          onClick={stop}
-          disabled={status === "idle"}
-          className="px-4 py-2 rounded-2xl border"
-        >
-          End voice
-        </button>
-      </div>
-
-      {note ? <div className="text-sm opacity-80">{note}</div> : null}
+      <button
+        type="button"
+        onClick={stop}
+        disabled={!live}
+        className="px-3 py-2 rounded-xl border text-sm shadow-sm bg-white border-gray-200 text-gray-600 disabled:opacity-50"
+        title="End voice"
+      >
+        End
+      </button>
     </div>
   );
 }

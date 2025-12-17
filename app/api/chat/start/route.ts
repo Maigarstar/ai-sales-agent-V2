@@ -27,15 +27,17 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    const user_type = clean(body.user_type) || "planning";
+    const user_type = clean(body.user_type) || "couple"; // "vendor" or "couple"
     const contact_name = clean(body.contact_name);
     const contact_email = clean(body.contact_email);
     const contact_phone = clean(body.contact_phone);
-    const contact_company = clean(body.contact_company);
 
-    // Keep reading website from the client if you want, but do not insert it
-    // until the column exists in Supabase.
-    // const website = clean(body.website);
+    const venue_or_location = clean(body.venue_or_location);
+    const website = clean(body.website);
+
+    // wedding_date can arrive as "YYYY-MM-DD"
+    const wedding_date_raw = clean(body.wedding_date);
+    const wedding_date = wedding_date_raw ? wedding_date_raw : null;
 
     if (!contact_name && !contact_email && !contact_phone) {
       return NextResponse.json(
@@ -45,10 +47,10 @@ export async function POST(req: Request) {
     }
 
     const conversationId = randomUUID();
-
     const supabase = supabaseAdmin();
 
-    const { error } = await supabase.from("conversations").insert({
+    // Build insert payload
+    const insertRow: Record<string, any> = {
       id: conversationId,
       user_type,
       status: "new",
@@ -57,16 +59,37 @@ export async function POST(req: Request) {
       contact_name,
       contact_email,
       contact_phone,
-      contact_company,
+      venue_or_location,
+      website,
+      wedding_date,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    // Insert, if schema has missing columns we retry without them
+    const tryInsert = async (row: Record<string, any>) => {
+      return await supabase.from("conversations").insert(row);
+    };
+
+    let { error } = await tryInsert(insertRow);
 
     if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      );
+      const msg = (error.message || "").toLowerCase();
+
+      const retryRow = { ...insertRow };
+
+      if (msg.includes("column") && msg.includes("website")) delete retryRow.website;
+      if (msg.includes("column") && msg.includes("wedding_date")) delete retryRow.wedding_date;
+      if (msg.includes("column") && msg.includes("venue_or_location"))
+        delete retryRow.venue_or_location;
+
+      // retry once
+      const retry = await tryInsert(retryRow);
+      error = retry.error || null;
+    }
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, conversationId }, { status: 200 });

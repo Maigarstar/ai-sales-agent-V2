@@ -1,106 +1,143 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AudioLines } from "lucide-react";
 
-type Status = "idle" | "connecting" | "live" | "error";
+type Props = {
+  className?: string;
+};
 
-export default function AuraVoice() {
+export default function AuraVoice(props: Props) {
+  const [active, setActive] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [hadError, setHadError] = useState(false);
+
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const [status, setStatus] = useState<Status>("idle");
-
   async function start() {
-    if (status !== "idle") return;
-
-    setStatus("connecting");
+    if (busy || active) return;
+    setBusy(true);
+    setHadError(false);
 
     try {
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
 
-      const audioEl = document.createElement("audio");
-      audioEl.autoplay = true;
-      audioRef.current = audioEl;
-
-      pc.ontrack = (e) => {
-        audioEl.srcObject = e.streams[0];
+      pc.ontrack = (event) => {
+        const [remoteStream] = event.streams;
+        if (!audioRef.current) return;
+        audioRef.current.srcObject = remoteStream;
+        audioRef.current.play().catch(() => {});
       };
 
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "connected") setStatus("live");
-        if (pc.connectionState === "failed" || pc.connectionState === "disconnected")
-          setStatus("error");
-      };
+      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = localStream;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      streamRef.current = stream;
-
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-
-      pc.createDataChannel("oai-events");
+      for (const track of localStream.getTracks()) {
+        pc.addTrack(track, localStream);
+      }
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      const sdpAnswer = await fetch("/api/voice", {
+      const sdpOffer = pc.localDescription?.sdp || "";
+      const res = await fetch("/api/voice", {
         method: "POST",
         headers: { "Content-Type": "application/sdp" },
-        body: offer.sdp ?? "",
-      }).then(async (res) => {
-        const t = await res.text();
-        if (!res.ok) throw new Error(t || `Server error ${res.status}`);
-        return t;
+        body: sdpOffer,
       });
 
+      if (!res.ok) {
+        const t = await res.text().catch(() => "Voice start failed");
+        throw new Error(t);
+      }
+
+      const sdpAnswer = await res.text();
       await pc.setRemoteDescription({ type: "answer", sdp: sdpAnswer });
-    } catch {
+
+      setActive(true);
+    } catch (e) {
+      console.error("AuraVoice start error", e);
+      setHadError(true);
       stop();
-      setStatus("error");
+    } finally {
+      setBusy(false);
     }
   }
 
   function stop() {
-    pcRef.current?.close();
+    try {
+      pcRef.current?.getSenders().forEach((s) => s.track?.stop());
+      pcRef.current?.close();
+    } catch {}
+
     pcRef.current = null;
 
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
+    try {
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    } catch {}
 
-    if (audioRef.current) audioRef.current.srcObject = null;
+    localStreamRef.current = null;
 
-    setStatus("idle");
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+      } catch {}
+      audioRef.current.srcObject = null;
+    }
+
+    setActive(false);
+    setBusy(false);
   }
 
-  const live = status === "live";
-  const connecting = status === "connecting";
+  function toggle() {
+    if (active) stop();
+    else void start();
+  }
+
+  useEffect(() => {
+    return () => stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={start}
-        disabled={connecting || live}
-        className={`px-3 py-2 rounded-xl border text-sm shadow-sm transition-colors ${
-          live ? "bg-green-50 border-green-200 text-green-800" : "bg-white border-gray-200 text-gray-700"
-        } ${connecting ? "opacity-60" : ""}`}
-        title="Start voice"
-      >
-        {connecting ? "Voice..." : live ? "Live" : "Voice"}
-      </button>
+    <>
+      <audio ref={audioRef} autoPlay className="hidden" />
 
       <button
         type="button"
-        onClick={stop}
-        disabled={!live}
-        className="px-3 py-2 rounded-xl border text-sm shadow-sm bg-white border-gray-200 text-gray-600 disabled:opacity-50"
-        title="End voice"
+        onClick={toggle}
+        disabled={busy}
+        aria-label={active ? "Turn on off" : "Turn on on"}
+        aria-pressed={active}
+        title={
+          hadError
+            ? "Microphone permission needed"
+            : active
+              ? "On"
+              : "Off"
+        }
+        className={[
+          "relative h-11 w-11 rounded-full flex items-center justify-center shadow-sm transition active:scale-95",
+          active
+            ? "bg-black text-white"
+            : "bg-white text-gray-900 border border-gray-200",
+          hadError ? "border border-red-300" : "",
+          busy ? "opacity-60 cursor-not-allowed" : "opacity-100",
+          props.className || "",
+        ].join(" ")}
       >
-        End
+        {active && (
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 rounded-full bg-black/15 animate-ping"
+          />
+        )}
+
+        <AudioLines size={18} className={active ? "opacity-95" : "opacity-70"} />
       </button>
-    </div>
+    </>
   );
 }

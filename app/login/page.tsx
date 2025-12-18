@@ -1,131 +1,74 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import Link from "next/link";
-import { createBrowserClient } from "@supabase/ssr";
+import { useState } from "react";
+import { supabase } from "@/lib/supabase"; // Ensure this points to your supabase client
 import { useRouter } from "next/navigation";
+import { Mail, Lock, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white">Loading...</div>}>
-      <LoginForm />
-    </Suspense>
-  );
-}
-
-function LoginForm() {
-  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    
+    const { data, error } = isRegistering 
+      ? await supabase.auth.signUp({ email, password })
+      : await supabase.auth.signInWithPassword({ email, password });
 
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError) {
-      setError(signInError.message);
-      setLoading(false);
+    if (error) {
+      alert(error.message);
     } else {
-      router.push("/admin");
-      router.refresh();
+      // If new user, they go to onboarding. If existing, to chat.
+      router.push(isRegistering ? "/onboarding" : "/wedding-concierge");
     }
+    setLoading(false);
   };
 
   return (
-    // CHANGE: 'bg-white' on mobile, 'sm:bg-gray-50' on desktop.
-    <div className="min-h-screen bg-white sm:bg-gray-50 flex flex-col justify-center py-8 sm:py-12 sm:px-6 lg:px-8">
-      
-      {/* Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <h2 className="mt-2 text-center text-2xl sm:text-3xl font-extrabold text-gray-900 font-sans">
-          Admin Login
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Sign in to manage your AI sales agent and leads.
-        </p>
-      </div>
-
-      {/* Card Wrapper */}
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        {/* CHANGE: Remove shadow/border on mobile. Add them back on 'sm:' screens */}
-        <div className="bg-white py-8 px-6 shadow-none sm:shadow sm:rounded-xl sm:px-10 border-0 sm:border border-gray-100">
-          <form className="space-y-6" onSubmit={handleLogin}>
-            
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <div className="mt-1">
-                {/* CHANGE: text-base prevents iOS zoom on focus */}
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="you@example.com"
-                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] text-base sm:text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  placeholder="••••••••"
-                  className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#1F4D3E] focus:border-[#1F4D3E] text-base sm:text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end">
-              <div className="text-sm">
-                <Link href="/forgot-password" className="font-medium text-[#1F4D3E] hover:text-[#163C30]">
-                  Forgot your password?
-                </Link>
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-[#1F4D3E] hover:bg-[#163C30] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1F4D3E] transition-colors disabled:opacity-50"
-              >
-                {loading ? "Signing in..." : "Sign in"}
-              </button>
-            </div>
-          </form>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 border border-gray-100">
+        <div className="text-center mb-8">
+          <h1 className="text-[#1F4D3E] font-serif text-3xl mb-2">5 Star Weddings</h1>
+          <p className="text-gray-500 text-sm">Luxury Concierge Access</p>
         </div>
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          <div className="relative">
+            <Mail className="absolute left-3 top-3.5 text-gray-400" size={18} />
+            <input 
+              type="email" placeholder="Email Address" required
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#1F4D3E] outline-none"
+              value={email} onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-3.5 text-gray-400" size={18} />
+            <input 
+              type="password" placeholder="Password" required
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#1F4D3E] outline-none"
+              value={password} onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <button 
+            disabled={loading}
+            className="w-full py-4 bg-[#1F4D3E] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#163C30] transition-all"
+          >
+            {loading ? "Please wait..." : isRegistering ? "Create Account" : "Sign In"}
+            <ArrowRight size={18} />
+          </button>
+        </form>
+
+        <button 
+          onClick={() => setIsRegistering(!isRegistering)}
+          className="w-full mt-6 text-sm text-gray-500 hover:text-[#1F4D3E]"
+        >
+          {isRegistering ? "Already have an account? Sign In" : "New to 5 Star? Create an Account"}
+        </button>
       </div>
     </div>
   );

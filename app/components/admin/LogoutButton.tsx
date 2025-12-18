@@ -1,34 +1,36 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 
 export default function LogoutButton() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+
+  // Initialize the browser-side Supabase client
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const handleLogout = async () => {
-    setLoading(true);
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
+    // 1. Sign out from Supabase
     await supabase.auth.signOut();
-    router.push("/login");
+    
+    // 2. Refresh the current page to clear server-side state/cookies
     router.refresh();
+    
+    // 3. Redirect to the home page
+    router.push("/");
   };
 
   return (
     <button
       onClick={handleLogout}
-      disabled={loading}
-      className="flex w-full items-center gap-3 px-3 py-3 text-sm font-medium text-gray-300 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-colors text-left"
+      className="flex items-center gap-3 px-4 py-3 text-red-500 text-sm font-medium hover:bg-red-50 rounded-2xl transition-all w-full"
     >
-      <LogOut size={20} />
-      <span>{loading ? "Signing out..." : "Log out"}</span>
+      <LogOut size={18} />
+      Sign Out
     </button>
   );
 }

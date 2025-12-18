@@ -17,7 +17,7 @@
     "baseUrl": ".",
 
     "paths": {
-      "@/*": ["app/*"],
+      "@/*": ["app/*", "*"],
 
       "@/ecme/*": ["app/ecme/*"],
 
@@ -28,7 +28,7 @@
 
       "@/@types/*": ["app/ecme/types/*"],
 
-      "@/lib/*": ["app/lib/*"],
+      "@/lib/*": ["lib/*", "app/lib/*"],
       "@/admin/*": ["app/admin/*"]
     },
 
@@ -46,11 +46,9 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts",
-    "app/vendors-chat-bin/page.tsx-bin",
     "tailwind.config.js",
-    "app/lib/supabaseClient.ts",
-    "app/api/admin/vendor-applications/[id]/route.ts--old"
-, "app/api/directory/search/DEMO-route", "next.config.mjs", "lib/directory-TO=BE-TS"  ],
+    "next.config.mjs"
+  ],
 
   "exclude": ["node_modules"]
 }

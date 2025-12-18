@@ -24,6 +24,13 @@ import {
   CalendarDays,
   Users,
   Heart,
+  Paperclip,
+  ThumbsUp,
+  ThumbsDown,
+  Share2,
+  Copy,
+  Sun,
+  Moon,
 } from "lucide-react";
 import AuraVoice from "@/components/AuraVoice";
 import VoiceToTextButton from "@/components/VoiceToTextButton";
@@ -43,6 +50,7 @@ const STORAGE_KEY_COOKIE = "fsw_cookie_consent";
 const STORAGE_KEY_SESSIONS = "fsw_chat_sessions_v1";
 const STORAGE_KEY_USER = "fsw_user_v1";
 const STORAGE_KEY_CONV_PREFIX = "fsw_chat_conv_";
+const STORAGE_KEY_THEME = "fsw_theme_v1";
 
 let __gaLoaded = false;
 let __gtmLoaded = false;
@@ -157,6 +165,24 @@ function useConsentApply() {
 }
 
 /* =========================================================
+   THEME
+   ========================================================= */
+function applyThemeToDom(theme: "light" | "dark") {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (theme === "dark") root.classList.add("dark");
+  else root.classList.remove("dark");
+}
+
+function getInitialTheme(): "light" | "dark" {
+  if (typeof window === "undefined") return "light";
+  const stored = localStorage.getItem(STORAGE_KEY_THEME);
+  if (stored === "dark" || stored === "light") return stored;
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return prefersDark ? "dark" : "light";
+}
+
+/* =========================================================
    STARTER CHIPS
    ========================================================= */
 const VENDOR_PROMPTS = [
@@ -215,13 +241,13 @@ function FormattedMessage({ content }: { content: string }) {
 
         if (isH3)
           return (
-            <h3 key={i} className="text-lg font-bold text-[#1F4D3E] mt-3 mb-1">
+            <h3 key={i} className="text-lg font-bold text-[#1F4D3E] dark:text-emerald-300 mt-3 mb-1">
               {trimmed.substring(4)}
             </h3>
           );
         if (isH4)
           return (
-            <h4 key={i} className="text-md font-bold text-gray-900 mt-2 mb-1">
+            <h4 key={i} className="text-md font-bold text-gray-900 dark:text-gray-100 mt-2 mb-1">
               {trimmed.substring(5)}
             </h4>
           );
@@ -236,7 +262,7 @@ function FormattedMessage({ content }: { content: string }) {
         const parts = displayText.split(/(\*\*.*?\*\*)/g).map((part, j) => {
           if (part.startsWith("**") && part.endsWith("**")) {
             return (
-              <strong key={j} className="font-semibold text-gray-900">
+              <strong key={j} className="font-semibold text-gray-900 dark:text-gray-100">
                 {part.slice(2, -2)}
               </strong>
             );
@@ -249,18 +275,20 @@ function FormattedMessage({ content }: { content: string }) {
             <div key={i} className="flex items-start">
               <span
                 className={`mr-2 mt-1 flex-shrink-0 ${
-                  isBullet ? "w-1.5 h-1.5 bg-gray-400 rounded-full mt-2" : "font-bold text-[#1F4D3E] text-xs min-w-[16px]"
+                  isBullet
+                    ? "w-1.5 h-1.5 bg-gray-400 rounded-full mt-2"
+                    : "font-bold text-[#1F4D3E] dark:text-emerald-300 text-xs min-w-[16px]"
                 }`}
               >
                 {isNumber ? trimmed.match(/^\d+/)?.[0] + "." : ""}
               </span>
-              <span className="leading-relaxed text-gray-800">{parts}</span>
+              <span className="leading-relaxed text-gray-800 dark:text-gray-200">{parts}</span>
             </div>
           );
         }
 
         return (
-          <p key={i} className="leading-relaxed text-gray-800">
+          <p key={i} className="leading-relaxed text-gray-800 dark:text-gray-200">
             {parts}
           </p>
         );
@@ -326,22 +354,25 @@ function CookiePreferenceCenter({ isOpen, onClose }: { isOpen: boolean; onClose:
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col relative overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h2 className="text-xl font-semibold text-gray-900">Cookie Preference Center</h2>
-          <button onClick={onClose} className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+      <div className="bg-white dark:bg-[#0F1412] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col relative overflow-hidden">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-white/10">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Cookie Preference Center</h2>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10"
+          >
             <X size={24} />
           </button>
         </div>
         <div className="p-6 overflow-y-auto">
-          <p className="text-[14px] text-gray-600 leading-relaxed mb-6">
+          <p className="text-[14px] text-gray-600 dark:text-gray-300 leading-relaxed mb-6">
             We use cookies for essential operations, analytics and marketing measurement. You can change your choices any
             time.{" "}
             <a
               href="https://5starweddingdirectory.com/privacy"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline text-gray-800 hover:text-black"
+              className="underline text-gray-800 dark:text-gray-100 hover:text-black"
             >
               Learn more
             </a>
@@ -350,31 +381,35 @@ function CookiePreferenceCenter({ isOpen, onClose }: { isOpen: boolean; onClose:
           <div className="space-y-6">
             <div className="flex items-start justify-between">
               <div className="pr-4">
-                <div className="font-medium text-gray-900 text-[15px] mb-1">Strictly Necessary Cookies</div>
-                <div className="text-[13px] text-gray-500">Security, authentication, performance</div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-[15px] mb-1">
+                  Strictly Necessary Cookies
+                </div>
+                <div className="text-[13px] text-gray-500 dark:text-gray-400">Security, authentication, performance</div>
               </div>
               <Toggle checked={true} disabled />
             </div>
-            <div className="h-px bg-gray-100 w-full" />
+            <div className="h-px bg-gray-100 dark:bg-white/10 w-full" />
             <div className="flex items-start justify-between">
               <div className="pr-4">
-                <div className="font-medium text-gray-900 text-[15px] mb-1">Analytics Cookies</div>
-                <div className="text-[13px] text-gray-500">Traffic and improvement</div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-[15px] mb-1">Analytics Cookies</div>
+                <div className="text-[13px] text-gray-500 dark:text-gray-400">Traffic and improvement</div>
               </div>
               <Toggle checked={analytics} onChange={setAnalytics} />
             </div>
-            <div className="h-px bg-gray-100 w-full" />
+            <div className="h-px bg-gray-100 dark:bg-white/10 w-full" />
             <div className="flex items-start justify-between">
               <div className="pr-4">
-                <div className="font-medium text-gray-900 text-[15px] mb-1">Marketing Performance Cookies</div>
-                <div className="text-[13px] text-gray-500">Campaign effectiveness</div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-[15px] mb-1">
+                  Marketing Performance Cookies
+                </div>
+                <div className="text-[13px] text-gray-500 dark:text-gray-400">Campaign effectiveness</div>
               </div>
               <Toggle checked={marketing} onChange={setMarketing} />
             </div>
           </div>
         </div>
-        <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-gray-600 text-sm font-medium hover:text-gray-900">
+        <div className="p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 dark:text-gray-300 text-sm font-medium">
             Cancel
           </button>
           <button
@@ -447,7 +482,7 @@ function AuthModal({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] relative overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-[#0F1412] rounded-2xl shadow-2xl w-full max-w-[420px] relative overflow-hidden flex flex-col">
         <button onClick={onClose} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 z-10">
           <X size={20} />
         </button>
@@ -458,19 +493,19 @@ function AuthModal({
             {view === "login" && "Welcome Back"}
             {view === "forgot" && "Reset Password"}
           </h2>
-          <p className="text-gray-500 text-sm text-center mb-6">
+          <p className="text-gray-500 dark:text-gray-300 text-sm text-center mb-6">
             {view === "register" && "Save your chat and planning tools."}
             {view === "login" && "Access your saved wedding plans."}
             {view === "forgot" && "We will send you a recovery link."}
           </p>
 
           {view !== "forgot" && (
-            <div className="bg-gray-100 p-1 rounded-lg flex mb-4">
+            <div className="bg-gray-100 dark:bg-white/10 p-1 rounded-lg flex mb-4">
               <button
                 type="button"
                 onClick={() => setRole("couple")}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
-                  role === "couple" ? "bg-white text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  role === "couple" ? "bg-white dark:bg-[#0F1412] text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 <User size={16} /> Couple
@@ -479,7 +514,7 @@ function AuthModal({
                 type="button"
                 onClick={() => setRole("vendor")}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
-                  role === "vendor" ? "bg-white text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  role === "vendor" ? "bg-white dark:bg-[#0F1412] text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 <Store size={16} /> Vendor
@@ -489,9 +524,9 @@ function AuthModal({
         </div>
 
         {successMsg && (
-          <div className="absolute inset-0 bg-white/90 z-20 flex flex-col items-center justify-center animate-in fade-in">
+          <div className="absolute inset-0 bg-white/90 dark:bg-black/70 z-20 flex flex-col items-center justify-center animate-in fade-in">
             <CheckCircle size={48} className="text-green-600 mb-4" />
-            <p className="text-lg font-medium text-gray-900">{successMsg}</p>
+            <p className="text-lg font-medium text-gray-900 dark:text-gray-100">{successMsg}</p>
           </div>
         )}
 
@@ -509,7 +544,7 @@ function AuthModal({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your Name"
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all text-gray-900 dark:text-gray-100"
                 />
               </div>
             </div>
@@ -527,7 +562,7 @@ function AuthModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all text-gray-900 dark:text-gray-100"
               />
             </div>
           </div>
@@ -554,7 +589,7 @@ function AuthModal({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] outline-none transition-all text-gray-900 dark:text-gray-100"
                 />
               </div>
             </div>
@@ -577,7 +612,7 @@ function AuthModal({
 
           <div className="mt-2 text-center">
             {view === "register" && (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 Already have an account?{" "}
                 <button type="button" onClick={() => setView("login")} className="text-[#1F4D3E] font-medium hover:underline">
                   Log in
@@ -585,7 +620,7 @@ function AuthModal({
               </p>
             )}
             {view === "login" && (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 New here?{" "}
                 <button type="button" onClick={() => setView("register")} className="text-[#1F4D3E] font-medium hover:underline">
                   Create account
@@ -596,7 +631,7 @@ function AuthModal({
               <button
                 type="button"
                 onClick={() => setView("login")}
-                className="text-sm text-gray-500 hover:text-gray-800 flex items-center justify-center gap-1 mx-auto"
+                className="text-sm text-gray-500 dark:text-gray-300 hover:text-gray-800 flex items-center justify-center gap-1 mx-auto"
               >
                 <ArrowLeft size={14} /> Back to Log In
               </button>
@@ -614,17 +649,17 @@ function AuthModal({
 function BrandFooter({ onOpenCookies }: { onOpenCookies: () => void }) {
   const year = new Date().getFullYear();
   return (
-    <div className="w-full text-center text-[11px] sm:text-[12px] text-gray-500 py-6 mt-auto">
+    <div className="w-full text-center text-[11px] sm:text-[12px] text-gray-500 dark:text-gray-400 py-6 mt-auto">
       <div className="flex flex-wrap justify-center items-center gap-1 opacity-80">
         <span>Powered by Taigenic.ai</span>
         <span className="hidden sm:inline">•</span>
-        <span>5 Star Weddings Ltd. 2006-{year}</span>
+        <span>5 Star Weddings Ltd. 2006 {year}</span>
         <span className="hidden sm:inline">•</span>
         <span className="inline-flex gap-1">
           See{" "}
           <button
             onClick={onOpenCookies}
-            className="underline decoration-gray-400 hover:text-gray-800 hover:decoration-gray-600"
+            className="underline decoration-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:decoration-gray-600"
           >
             Cookie Preferences
           </button>
@@ -665,6 +700,12 @@ function formatTime(ts: number) {
 
 function convStorageKey(conversationId: string) {
   return `${STORAGE_KEY_CONV_PREFIX}${conversationId}`;
+}
+
+function safeInitial(name?: string) {
+  const t = (name || "").trim();
+  if (!t) return "U";
+  return t[0]?.toUpperCase() || "U";
 }
 
 /* =========================================================
@@ -714,8 +755,53 @@ export default function VendorsChatInner() {
   const userKey = useMemo(() => buildUserKey(savedUser), [savedUser]);
   const isSignedIn = !!savedUser?.email;
 
+  // Theme
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  useEffect(() => {
+    const t = getInitialTheme();
+    setTheme(t);
+    applyThemeToDom(t);
+  }, []);
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem(STORAGE_KEY_THEME, next);
+    applyThemeToDom(next);
+  }
+
   // Start closed everywhere by default (ChatGPT feel)
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Upload state
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; url?: string }[]>([]);
+
+  async function handleFilesSelected(files: FileList | null) {
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      Array.from(files).forEach((f) => form.append("files", f));
+      if (conversationId) form.append("conversationId", conversationId);
+
+      const res = await fetch("/api/chat/upload", { method: "POST", body: form });
+      const data = await res.json();
+
+      if (data?.ok && Array.isArray(data.files)) {
+        setUploadedFiles((prev) => [...data.files, ...prev]);
+
+        const names = data.files.map((f: any) => f.name).join(", ");
+        const userMsg: ChatMessage = { role: "user", content: `Uploaded files: ${names}` };
+        const nextMessages = clampMessages([...messages, userMsg], 80);
+        setMessages(nextMessages);
+      }
+    } catch {
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function persistSessions(next: SidebarSession[]) {
     setSessions(next);
@@ -750,6 +836,7 @@ export default function VendorsChatInner() {
       setMessages([]);
       setConversationId(null);
       setInput("");
+      setUploadedFiles([]);
       setFormData({ name: "", email: "", phone: "", venueOrLocation: "", website: "", weddingDate: "" });
     }
   }
@@ -760,12 +847,11 @@ export default function VendorsChatInner() {
     setMessages([]);
     setConversationId(null);
     setInput("");
+    setUploadedFiles([]);
     setFormError("");
 
-    // Keep current mode when signed in, hide role switch UI, so no revert feeling
     if (!isSignedIn && nextMode) setMode(nextMode);
 
-    // Keep view: if signed in, stay on form but without the role selector, and keep name/email filled
     setView("form");
     setSidebarOpen(false);
   }
@@ -1007,6 +1093,7 @@ export default function VendorsChatInner() {
     setMessages([]);
     setConversationId(null);
     setInput("");
+    setUploadedFiles([]);
     setFormData({ name: "", email: "", phone: "", venueOrLocation: "", website: "", weddingDate: "" });
   };
 
@@ -1025,51 +1112,68 @@ export default function VendorsChatInner() {
     setSessions(all);
   };
 
+  async function handleCopy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {}
+  }
+
+  function handleShare(text: string) {
+    try {
+      const canShare = typeof navigator !== "undefined" && (navigator as any).share;
+      if (canShare) {
+        (navigator as any).share({ text });
+        return;
+      }
+      handleCopy(text);
+    } catch {}
+  }
+
   if (!isRestored) return null;
 
   /* =========================================================
      Sidebar UI
      ========================================================= */
   const WeddingTools = (
-    <div className="mt-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
-      <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+    <div className="mt-3 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+      <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
         <LayoutGrid size={16} className="text-gray-500" />
         Wedding tools
       </div>
       <div className="grid grid-cols-2 gap-2 mt-3">
-        <button type="button" className="px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm flex items-center gap-2">
+        <button type="button" className="px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-sm flex items-center gap-2">
           <LayoutGrid size={16} className="text-gray-500" /> Budget
         </button>
-        <button type="button" className="px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm flex items-center gap-2">
+        <button type="button" className="px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-sm flex items-center gap-2">
           <Users size={16} className="text-gray-500" /> Guest list
         </button>
-        <button type="button" className="px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm flex items-center gap-2">
+        <button type="button" className="px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-sm flex items-center gap-2">
           <CalendarDays size={16} className="text-gray-500" /> Timeline
         </button>
-        <button type="button" className="px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm flex items-center gap-2">
+        <button type="button" className="px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-sm flex items-center gap-2">
           <Heart size={16} className="text-gray-500" /> Honeymoon
         </button>
       </div>
-      <div className="mt-3 text-[11px] text-gray-500">This stays on the front end, no admin access needed.</div>
+      <div className="mt-3 text-[11px] text-gray-500 dark:text-gray-400">This stays on the front end, no admin access needed.</div>
     </div>
   );
 
   const SidebarContent = (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gray-100 bg-white">
+      <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#0F1412]">
         <div className="flex items-start justify-between gap-3">
           <div className="leading-tight">
-            <div className="text-[13px] text-gray-500">5 Star Weddings</div>
-            <div className="text-[15px] font-semibold text-gray-900">Concierge</div>
+            <div className="text-[13px] text-gray-500 dark:text-gray-400">5 Star Weddings</div>
+            <div className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">Concierge</div>
           </div>
 
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="hidden md:inline-flex p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50"
+            className="hidden md:inline-flex p-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10"
             title="Close sidebar"
           >
-            <PanelLeftClose size={18} className="text-gray-700" />
+            <PanelLeftClose size={18} className="text-gray-700 dark:text-gray-200" />
           </button>
         </div>
 
@@ -1090,19 +1194,18 @@ export default function VendorsChatInner() {
               value={sessionQuery}
               onChange={(e) => setSessionQuery(e.target.value)}
               placeholder="Search chats"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg outline-none focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E] text-gray-900 dark:text-gray-100"
             />
           </div>
         </div>
 
-        {/* When logged in, hide role switch options on the left sidebar */}
         {!isSignedIn && (
-          <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-1 flex">
+          <div className="mt-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg p-1 flex">
             <button
               type="button"
               onClick={() => setMode("vendor")}
               className={`flex-1 text-xs font-medium px-3 py-2 rounded-md transition ${
-                mode === "vendor" ? "bg-white text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                mode === "vendor" ? "bg-white dark:bg-[#0F1412] text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
             >
               Vendor
@@ -1111,7 +1214,7 @@ export default function VendorsChatInner() {
               type="button"
               onClick={() => setMode("couple")}
               className={`flex-1 text-xs font-medium px-3 py-2 rounded-md transition ${
-                mode === "couple" ? "bg-white text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                mode === "couple" ? "bg-white dark:bg-[#0F1412] text-[#1F4D3E] shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
             >
               Couple
@@ -1120,30 +1223,30 @@ export default function VendorsChatInner() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-white">
+      <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0F1412]">
         <div className="p-3">
           {savedUser?.email ? (
-            <div className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
-              <div className="text-xs text-gray-500">Signed in</div>
-              <div className="text-sm font-medium text-gray-900 truncate">{savedUser.name || "User"}</div>
-              <div className="text-xs text-gray-500 truncate">{savedUser.email}</div>
+            <div className="mb-3 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+              <div className="text-xs text-gray-500 dark:text-gray-400">Signed in</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{savedUser.name || "User"}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{savedUser.email}</div>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10"
                 >
                   Sign out
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10"
                 >
                   Switch user
                 </button>
               </div>
-              <div className="mt-2 text-[11px] text-gray-500">
+              <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
                 Chats save in this browser. Multi device sync comes next.
               </div>
             </div>
@@ -1151,7 +1254,7 @@ export default function VendorsChatInner() {
             <button
               type="button"
               onClick={() => setIsAuthModalOpen(true)}
-              className="w-full mb-3 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm"
+              className="w-full mb-3 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-sm text-gray-900 dark:text-gray-100"
             >
               <UserPlus size={16} /> Sign in to save chat history
             </button>
@@ -1159,13 +1262,13 @@ export default function VendorsChatInner() {
 
           {!isSignedIn && mode === "couple" && WeddingTools}
 
-          <div className="text-xs font-semibold text-gray-500 px-1 mb-2 flex items-center gap-2 mt-3">
+          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-1 mb-2 flex items-center gap-2 mt-3">
             <MessageSquare size={14} />
             Chat history
           </div>
 
           {filteredSessions.length === 0 ? (
-            <div className="text-sm text-gray-500 p-3 rounded-xl bg-gray-50 border border-gray-200">
+            <div className="text-sm text-gray-500 dark:text-gray-400 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10">
               No chats yet. Start one, then it will appear here.
             </div>
           ) : (
@@ -1178,16 +1281,18 @@ export default function VendorsChatInner() {
                     type="button"
                     onClick={() => openSession(s.conversationId)}
                     className={`w-full text-left p-3 rounded-xl border transition ${
-                      active ? "border-[#1F4D3E] bg-green-50/40" : "border-gray-200 bg-white hover:bg-gray-50"
+                      active
+                        ? "border-[#1F4D3E] bg-green-50/40 dark:bg-emerald-500/10"
+                        : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                           {s.title || (s.mode === "vendor" ? "Vendor chat" : "Couple chat")}
                         </div>
-                        <div className="text-xs text-gray-500 truncate mt-0.5">{s.lastMessage || "No messages yet"}</div>
-                        <div className="text-[11px] text-gray-400 mt-1">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{s.lastMessage || "No messages yet"}</div>
+                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
                           {s.mode === "vendor" ? "Vendor" : "Couple"} · {formatTime(s.updatedAt)}
                         </div>
                       </div>
@@ -1199,7 +1304,7 @@ export default function VendorsChatInner() {
                             e.stopPropagation();
                             if (confirm("Delete this chat from this browser?")) removeSession(s.conversationId);
                           }}
-                          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                           title="Delete chat"
                         >
                           <Trash2 size={16} />
@@ -1214,8 +1319,8 @@ export default function VendorsChatInner() {
         </div>
       </div>
 
-      <div className="p-3 border-t border-gray-100 bg-white">
-        <div className="text-[11px] text-gray-500 leading-relaxed">
+      <div className="p-3 border-t border-gray-100 dark:border-white/10 bg-white dark:bg-[#0F1412]">
+        <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
           Safe by default, chats are stored locally, limited to recent messages, and you can delete any time.
         </div>
       </div>
@@ -1224,7 +1329,7 @@ export default function VendorsChatInner() {
 
   const DesktopSidebar = (
     <div
-      className={`hidden md:block h-screen sticky top-0 border-r border-gray-200 bg-white transition-all duration-300 ${
+      className={`hidden md:block h-screen sticky top-0 border-r border-gray-200 dark:border-white/10 bg-white dark:bg-[#0F1412] transition-all duration-300 ${
         sidebarOpen ? "w-[320px]" : "w-[64px]"
       }`}
     >
@@ -1235,10 +1340,10 @@ export default function VendorsChatInner() {
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
+            className="p-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 shadow-sm"
             title="Open sidebar"
           >
-            <PanelLeftOpen size={18} className="text-gray-700" />
+            <PanelLeftOpen size={18} className="text-gray-700 dark:text-gray-200" />
           </button>
 
           <div className="mt-3 w-full px-2">
@@ -1256,21 +1361,32 @@ export default function VendorsChatInner() {
             <button
               type="button"
               onClick={() => setIsAuthModalOpen(true)}
-              className="w-full p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center"
+              className="w-full p-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center"
               title="Sign in"
             >
-              <UserPlus size={18} className="text-gray-700" />
+              <UserPlus size={18} className="text-gray-700 dark:text-gray-200" />
             </button>
           </div>
 
-          <div className="mt-auto pb-3">
+          <div className="mt-3 w-full px-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="w-full p-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center"
+              title="Theme"
+            >
+              {theme === "dark" ? <Sun size={18} className="text-gray-700 dark:text-gray-200" /> : <Moon size={18} className="text-gray-700 dark:text-gray-200" />}
+            </button>
+          </div>
+
+          <div className="mt-auto pb-3 flex flex-col gap-2">
             <button
               type="button"
               onClick={() => setIsCookieModalOpen(true)}
-              className="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50"
+              className="p-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10"
               title="Cookie preferences"
             >
-              <Menu size={18} className="text-gray-700" />
+              <Menu size={18} className="text-gray-700 dark:text-gray-200" />
             </button>
           </div>
         </div>
@@ -1282,21 +1398,33 @@ export default function VendorsChatInner() {
     <div className="md:hidden">
       <button
         onClick={() => setSidebarOpen(true)}
-        className="fixed left-4 top-4 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm"
+        className="fixed left-4 top-4 z-50 p-2 rounded-xl bg-white dark:bg-[#0F1412] border border-gray-200 dark:border-white/10 shadow-sm"
         title="Open menu"
       >
-        <Menu size={18} className="text-gray-700" />
+        <Menu size={18} className="text-gray-700 dark:text-gray-200" />
+      </button>
+
+      <button
+        onClick={toggleTheme}
+        className="fixed right-4 top-4 z-50 p-2 rounded-xl bg-white dark:bg-[#0F1412] border border-gray-200 dark:border-white/10 shadow-sm"
+        title="Theme"
+      >
+        {theme === "dark" ? <Sun size={18} className="text-gray-700 dark:text-gray-200" /> : <Moon size={18} className="text-gray-700 dark:text-gray-200" />}
       </button>
 
       <div className={`fixed inset-0 z-[9998] transition ${sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
         <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
         <div
-          className={`absolute left-0 top-0 h-full w-[320px] bg-white shadow-2xl transition-transform duration-300 ${
+          className={`absolute left-0 top-0 h-full w-[320px] bg-white dark:bg-[#0F1412] shadow-2xl transition-transform duration-300 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
           <div className="absolute right-3 top-3">
-            <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg text-gray-500 hover:bg-gray-100" title="Close">
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10"
+              title="Close"
+            >
               <X size={18} />
             </button>
           </div>
@@ -1311,7 +1439,7 @@ export default function VendorsChatInner() {
      ========================================================= */
   if (view === "form") {
     return (
-      <div className="min-h-screen flex bg-gray-50/50">
+      <div className="min-h-screen flex bg-gray-50/50 dark:bg-[#0B0F0D]">
         {!isEmbed && (
           <>
             {DesktopSidebar}
@@ -1328,17 +1456,29 @@ export default function VendorsChatInner() {
               <h2 className="text-[#2F4F3F] opacity-90" style={{ fontFamily: "var(--font-gilda-display), serif", fontSize: 32 }}>
                 Concierge
               </h2>
-              <p className="text-gray-500 mt-4 text-[16px]">Please tell us a bit about yourself to start.</p>
+
+              {isSignedIn ? (
+                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-700 dark:text-gray-200">
+                  <span className="h-6 w-6 rounded-full bg-[#1F4D3E] text-white flex items-center justify-center text-xs font-semibold">
+                    {safeInitial(savedUser?.name)}
+                  </span>
+                  <span>Hello, {savedUser?.name || "there"}</span>
+                  <button type="button" onClick={handleSignOut} className="text-xs text-[#1F4D3E] hover:underline">
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-300 mt-4 text-[16px]">Please tell us a bit about yourself to start.</p>
+              )}
             </div>
 
-            {/* When logged in, do not show the role selector */}
             {!isSignedIn && (
               <div className="flex justify-center mb-8">
-                <div className="bg-white p-1.5 rounded-full border border-gray-200 shadow-sm inline-flex">
+                <div className="bg-white dark:bg-white/5 p-1.5 rounded-full border border-gray-200 dark:border-white/10 shadow-sm inline-flex">
                   <button
                     onClick={() => setMode("vendor")}
                     className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
-                      mode === "vendor" ? "bg-[#1F4D3E] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      mode === "vendor" ? "bg-[#1F4D3E] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/10"
                     }`}
                   >
                     I am a Vendor
@@ -1346,7 +1486,7 @@ export default function VendorsChatInner() {
                   <button
                     onClick={() => setMode("couple")}
                     className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
-                      mode === "couple" ? "bg-[#1F4D3E] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      mode === "couple" ? "bg-[#1F4D3E] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/10"
                     }`}
                   >
                     I am a Couple
@@ -1356,74 +1496,74 @@ export default function VendorsChatInner() {
             )}
 
             <div className="sm:mx-auto sm:w-full sm:max-w-[500px]">
-              <div className={`bg-white shadow-xl shadow-gray-200/50 rounded-2xl border border-gray-100 ${isEmbed ? "p-6" : "p-8 sm:p-10"}`}>
+              <div className={`bg-white dark:bg-[#0F1412] shadow-xl shadow-gray-200/50 rounded-2xl border border-gray-100 dark:border-white/10 ${isEmbed ? "p-6" : "p-8 sm:p-10"}`}>
                 <form className="space-y-5" onSubmit={handleStartChat}>
                   {formError && (
                     <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">{formError}</div>
                   )}
 
                   <div className="space-y-1">
-                    <label className="block text-[15px] font-medium text-gray-700 ml-1">Name</label>
+                    <label className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 ml-1">Name</label>
                     <input
                       required
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
+                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[15px] font-medium text-gray-700 ml-1">Email</label>
+                    <label className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 ml-1">Email</label>
                     <input
                       required
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
+                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="block text-[15px] font-medium text-gray-700 ml-1">Phone</label>
+                      <label className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 ml-1">Phone</label>
                       <input
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
+                        className="block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="block text-[15px] font-medium text-gray-700 ml-1">{isVendor ? "Website" : "Wedding Date"}</label>
+                      <label className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 ml-1">{isVendor ? "Website" : "Wedding Date"}</label>
                       {isVendor ? (
                         <input
                           type="text"
                           value={formData.website}
                           onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                           placeholder="For example yoursite"
-                          className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
+                          className="block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
                         />
                       ) : (
                         <input
                           type="date"
                           value={formData.weddingDate}
                           onChange={(e) => setFormData({ ...formData, weddingDate: e.target.value })}
-                          className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
+                          className="block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
                         />
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[15px] font-medium text-gray-700 ml-1">
+                    <label className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 ml-1">
                       {isVendor ? "Company or Venue Name" : "Venue Location or Preferences"}
                     </label>
                     <input
                       type="text"
                       value={formData.venueOrLocation}
                       onChange={(e) => setFormData({ ...formData, venueOrLocation: e.target.value })}
-                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
+                      className="block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
                     />
                   </div>
 
@@ -1438,7 +1578,7 @@ export default function VendorsChatInner() {
                   </div>
                 </form>
 
-                <div className="mt-4 text-xs text-gray-500">
+                <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
                   Want to browse now?{" "}
                   <a href="https://5starweddingdirectory.com" target="_blank" rel="noopener noreferrer" className="text-[#1F4D3E] hover:underline">
                     Open 5starweddingdirectory.com
@@ -1461,7 +1601,7 @@ export default function VendorsChatInner() {
      CHAT VIEW
      ========================================================= */
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="min-h-screen flex bg-gray-50 dark:bg-[#0B0F0D]">
       {!isEmbed && (
         <>
           {DesktopSidebar}
@@ -1469,9 +1609,9 @@ export default function VendorsChatInner() {
         </>
       )}
 
-      <div className={`flex-1 flex flex-col bg-white sm:bg-gray-50 text-gray-900 font-sans ${isEmbed ? "h-screen" : ""}`}>
-        {/* Header, always visually centered on the viewport */}
-        <div className="bg-white px-4 sm:px-6 py-4 shadow-sm z-10 border-b border-gray-100 relative">
+      <div className={`flex-1 flex flex-col bg-white dark:bg-[#0F1412] text-gray-900 dark:text-gray-100 font-sans ${isEmbed ? "h-screen" : ""}`}>
+        {/* Header */}
+        <div className="bg-white dark:bg-[#0F1412] px-4 sm:px-6 py-4 shadow-sm z-10 border-b border-gray-100 dark:border-white/10 relative">
           <div className="relative h-[44px]">
             <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-center pointer-events-none">
               <h1 className="text-[#1F4D3E]" style={{ fontFamily: "var(--font-gilda-display), serif", fontSize: 28, lineHeight: 1 }}>
@@ -1483,16 +1623,30 @@ export default function VendorsChatInner() {
             </div>
 
             <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="text-gray-400 hover:text-[#1F4D3E] hover:bg-green-50 rounded-full p-2 transition-all"
-                title="Sign In or Register"
-              >
-                <UserPlus size={18} />
-              </button>
+              {isSignedIn ? (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-sm"
+                  title="Account"
+                >
+                  <span className="h-6 w-6 rounded-full bg-[#1F4D3E] text-white flex items-center justify-center text-xs font-semibold">
+                    {safeInitial(savedUser?.name)}
+                  </span>
+                  <span className="hidden sm:inline">Hello, {savedUser?.name || "there"}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="text-gray-400 hover:text-[#1F4D3E] hover:bg-green-50 dark:hover:bg-emerald-500/10 rounded-full p-2 transition-all"
+                  title="Sign In or Register"
+                >
+                  <UserPlus size={18} />
+                </button>
+              )}
+
               <button
                 onClick={handleDeleteConversation}
-                className="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full p-2 transition-all"
+                className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full p-2 transition-all"
                 title="End Chat"
               >
                 <Trash2 size={18} />
@@ -1501,7 +1655,7 @@ export default function VendorsChatInner() {
           </div>
         </div>
 
-        {/* Chat area, ChatGPT like width */}
+        {/* Chat area */}
         <div className="flex-1 overflow-hidden relative w-full">
           <div ref={scrollRef} className="h-full overflow-y-auto px-4 sm:px-6 py-4 space-y-6 scroll-smooth pb-28">
             <div className="w-full max-w-3xl mx-auto space-y-6">
@@ -1517,14 +1671,55 @@ export default function VendorsChatInner() {
                       5*
                     </div>
                   )}
-                  <div
-                    className={`max-w-[85%] sm:max-w-[75%] px-6 py-4 text-[15px] sm:text-base leading-relaxed shadow-sm ${
-                      m.role === "user"
-                        ? "bg-[#1F4D3E] text-white rounded-2xl rounded-br-sm"
-                        : "bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-bl-sm"
-                    }`}
-                  >
-                    {m.role === "user" ? m.content : <FormattedMessage content={m.content} />}
+
+                  <div className="max-w-[85%] sm:max-w-[75%]">
+                    <div
+                      className={`px-6 py-4 text-[15px] sm:text-base leading-relaxed shadow-sm ${
+                        m.role === "user"
+                          ? "bg-[#1F4D3E] text-white rounded-2xl rounded-br-sm"
+                          : "bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 text-gray-800 dark:text-gray-100 rounded-2xl rounded-bl-sm"
+                      }`}
+                    >
+                      {m.role === "user" ? m.content : <FormattedMessage content={m.content} />}
+                    </div>
+
+                    {/* Assistant message actions */}
+                    {m.role === "assistant" && (
+                      <div className="mt-2 flex items-center gap-2 text-gray-400">
+                        <button
+                          type="button"
+                          onClick={() => {}}
+                          className="p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200"
+                          title="Helpful"
+                        >
+                          <ThumbsUp size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {}}
+                          className="p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200"
+                          title="Not helpful"
+                        >
+                          <ThumbsDown size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleShare(m.content)}
+                          className="p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200"
+                          title="Share"
+                        >
+                          <Share2 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(m.content)}
+                          className="p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200"
+                          title="Copy"
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1532,7 +1727,7 @@ export default function VendorsChatInner() {
               {loading && (
                 <div className="flex justify-start w-full">
                   <div className="w-8 h-8 mr-2" />
-                  <div className="bg-white border border-gray-100 px-5 py-4 rounded-2xl rounded-bl-sm flex space-x-1 items-center shadow-sm">
+                  <div className="bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 px-5 py-4 rounded-2xl rounded-bl-sm flex space-x-1 items-center shadow-sm">
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce delay-150" />
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce delay-300" />
@@ -1543,16 +1738,16 @@ export default function VendorsChatInner() {
           </div>
         </div>
 
-        {/* Composer, same width as chat */}
-        <div className="bg-white border-t border-gray-100 p-4 w-full z-20">
+        {/* Composer */}
+        <div className="bg-white dark:bg-[#0F1412] border-t border-gray-100 dark:border-white/10 p-4 w-full z-20">
           <div className="w-full max-w-3xl mx-auto">
             {!loading && (
               <div className="flex gap-2 overflow-x-auto pb-3 mb-2">
-                {(isVendor ? VENDOR_PROMPTS : COUPLE_PROMPTS).map((prompt, i) => (
+                {(isVendor ? VENDOR_PROMPTS : COUPLE_PROMPTS).map((prompt, idx) => (
                   <button
-                    key={i}
+                    key={idx}
                     onClick={() => handleSend(undefined, prompt)}
-                    className="flex-shrink-0 px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full text-xs sm:text-sm text-gray-600 hover:text-[#1F4D3E] transition-all whitespace-nowrap flex items-center gap-1.5"
+                    className="flex-shrink-0 px-4 py-2 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 rounded-full text-xs sm:text-sm text-gray-600 dark:text-gray-300 hover:text-[#1F4D3E] transition-all whitespace-nowrap flex items-center gap-1.5"
                   >
                     <Sparkles size={12} className="opacity-50" />
                     {prompt}
@@ -1561,20 +1756,55 @@ export default function VendorsChatInner() {
               </div>
             )}
 
-            <div className="relative bg-white border border-gray-300 rounded-[26px] shadow-sm focus-within:ring-2 focus-within:ring-[#1F4D3E] focus-within:border-transparent transition-all">
+            {uploadedFiles.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {uploadedFiles.slice(0, 6).map((f, idx) => (
+                  <span
+                    key={idx}
+                    className="text-xs px-3 py-1.5 rounded-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200"
+                  >
+                    {f.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="relative bg-white dark:bg-[#0F1412] border border-gray-300 dark:border-white/10 rounded-[26px] shadow-sm focus-within:ring-2 focus-within:ring-[#1F4D3E] focus-within:border-transparent transition-all">
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={isVendor ? "Message Aura about your venue..." : "Message Aura about your wedding..."}
-                className="w-full bg-transparent outline-none resize-none text-[16px] leading-relaxed pl-5 pr-44 py-3 rounded-[26px]"
+                className="w-full bg-transparent outline-none resize-none text-[16px] leading-relaxed pl-5 pr-[264px] py-3 rounded-[26px] text-gray-900 dark:text-gray-100"
                 rows={1}
                 style={{ minHeight: "50px", maxHeight: "180px" }}
               />
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => handleFilesSelected(e.target.files)}
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.txt,.csv,.xlsx"
+              />
+
               <div className="absolute right-2 bottom-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || !conversationId}
+                  className="h-10 px-3 rounded-full flex items-center gap-2 border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 disabled:opacity-60"
+                  title="Upload files"
+                >
+                  <Paperclip size={16} />
+                  <span className="text-sm font-medium hidden sm:inline">{uploading ? "Uploading..." : "Upload"}</span>
+                </button>
+
                 <VoiceToTextButton onText={(t) => setInput((prev) => (prev ? `${prev} ${t}` : t))} />
                 <AuraVoice />
+
                 <button
                   onClick={() => handleSend()}
                   disabled={loading || !input.trim()}
@@ -1585,7 +1815,7 @@ export default function VendorsChatInner() {
               </div>
             </div>
 
-            <div className="mt-3 text-xs text-gray-500 flex items-center justify-between">
+            <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
               <span>
                 Tip, open the directory anytime:{" "}
                 <a href="https://5starweddingdirectory.com" target="_blank" rel="noopener noreferrer" className="text-[#1F4D3E] hover:underline">
@@ -1593,7 +1823,7 @@ export default function VendorsChatInner() {
                 </a>
               </span>
               {savedUser?.email ? (
-                <span className="text-gray-400">Saved as {savedUser.email}</span>
+                <span className="text-gray-400 dark:text-gray-500">Saved as {savedUser.email}</span>
               ) : (
                 <button type="button" onClick={() => setIsAuthModalOpen(true)} className="text-[#1F4D3E] hover:underline">
                   Sign in to save history

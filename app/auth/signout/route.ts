@@ -1,9 +1,9 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
+import { createServerClient } from "@supabase/ssr"
 
-export async function POST(request: Request) {
-  const cookieStore = await cookies();
+export async function POST(req: Request) {
+  const cookieStore = await cookies()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,23 +11,25 @@ export async function POST(request: Request) {
     {
       cookies: {
         get(name: string) {
-          return cookieStore.get(name)?.value;
+          return cookieStore.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options });
+          cookieStore.set({ name, value, ...options })
         },
         remove(name: string, options: any) {
-          cookieStore.set({ name, value: "", ...options });
+          cookieStore.set({ name, value: "", ...options })
         },
       },
     }
-  );
+  )
 
-  // Sign out from Supabase (clears the session)
-  await supabase.auth.signOut();
+  await supabase.auth.signOut()
 
-  // Redirect the user to the home page or login
-  return NextResponse.redirect(new URL("/", request.url), {
-    status: 302,
-  });
+  const url = new URL("/login", req.url)
+
+  const res = NextResponse.redirect(url, { status: 303 })
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+  res.headers.set("Pragma", "no-cache")
+  res.headers.set("Expires", "0")
+  return res
 }

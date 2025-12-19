@@ -1,245 +1,461 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
+import { AdminNav } from "./AdminNav";
 
-export default function AdminDashboardPage() {
+type Stat = { title: string; value: string; delta: string };
+type Activity = { name: string; note: string; when: string };
+
+function CardShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-full w-full p-6 lg:p-10">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
-          Dashboard
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Your AI sales pipeline, vendor activity and performance insights.
-        </p>
-      </div>
-
-      {/* Concierge workspace, now directly under the header and boxed */}
-      <section className="mb-10">
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 lg:p-7 shadow-sm">
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Concierge workspace
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-2xl">
-              Shortcuts to manage vendor leads, review full concierge
-              conversations and step into live chat when a human reply is
-              needed.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Vendor leads card */}
-            <WorkspaceCard
-              title="Vendor leads"
-              body="Review qualified vendors from the concierge, update their status and add notes as they move toward a partnership."
-              href="/admin/leads"
-              cta="Open vendor leads"
-            />
-
-            {/* Concierge conversations card */}
-            <WorkspaceCard
-              title="Concierge conversations"
-              body="Read full conversations with couples and venues, then create or update lead cards from a single place."
-              href="/admin/conversations"
-              cta="View conversations"
-            />
-
-            {/* Live chat card */}
-            <WorkspaceCard
-              title="Live chat takeover"
-              body="Watch conversations as they happen and step in personally when a couple or venue needs tailored guidance."
-              href="/admin/live-chat"
-              cta="Open live chat"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <DashboardCard
-          title="New Leads Today"
-          value="12"
-          change="+18 percent"
-          positive
-        />
-
-        <DashboardCard
-          title="Hot Leads"
-          value="4"
-          change="+33 percent"
-          positive
-        />
-
-        <DashboardCard title="Vendors Joined" value="3" change="Stable" />
-
-        <DashboardCard
-          title="AI Agent Accuracy"
-          value="92 percent"
-          change="+3 percent"
-          positive
-        />
-      </div>
-
-      {/* Two Column Main */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Lead Quality */}
-        <div className="lg:col-span-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Lead Quality Overview
-          </h2>
-
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            Snapshot of AI graded leads over the past seven days.
-          </p>
-
-          <div className="grid grid-cols-3 gap-4">
-            <QualityBox label="Hot" value="9" color="bg-emerald-500" />
-            <QualityBox label="Warm" value="17" color="bg-amber-500" />
-            <QualityBox label="Cold" value="5" color="bg-gray-400" />
-          </div>
-        </div>
-
-        {/* Vendor Activity */}
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Recent Vendor Activity
-          </h2>
-
-          <ul className="space-y-4">
-            <VendorItem
-              name="Bella Weddings Italy"
-              action="Submitted application"
-              time="2h ago"
-            />
-            <VendorItem
-              name="Cygnus Events"
-              action="Updated profile"
-              time="6h ago"
-            />
-            <VendorItem
-              name="MR Music Italy"
-              action="New inquiry"
-              time="1d ago"
-            />
-          </ul>
-        </div>
-      </div>
-    </div>
+    <section
+      style={{
+        borderRadius: 20,
+        backgroundColor: "#ffffff",
+        boxShadow: "0 14px 36px rgba(0,0,0,0.06)",
+        border: "1px solid rgba(24,63,52,0.06)",
+        padding: 20,
+      }}
+    >
+      {children}
+    </section>
   );
 }
 
-/* --------------------------------- */
-/*  COMPONENTS  */
-/* --------------------------------- */
-
-function DashboardCard({
-  title,
-  value,
-  change,
-  positive,
+function PillLink({
+  href,
+  children,
 }: {
-  title: string;
-  value: string;
-  change: string;
-  positive?: boolean;
+  href: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm transition hover:shadow-md">
-      <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-      <p className="mt-3 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-        {value}
-      </p>
-      <p
-        className={`mt-1 text-xs font-medium ${
-          positive
-            ? "text-emerald-600"
-            : "text-gray-500 dark:text-gray-400"
-        }`}
-      >
-        {change}
-      </p>
-    </div>
+    <a
+      href={href}
+      style={{
+        display: "inline-block",
+        padding: "8px 16px",
+        borderRadius: 999,
+        backgroundColor: "#183F34",
+        color: "#ffffff",
+        fontSize: 13,
+        textDecoration: "none",
+      }}
+    >
+      {children}
+    </a>
   );
 }
 
-function QualityBox({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color: string;
-}) {
-  return (
-    <div className="rounded-xl p-5 bg-gray-50 dark:bg-gray-800 shadow-sm flex flex-col items-center hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-      <div className={`w-4 h-4 rounded-full ${color} mb-3`} />
-      <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function VendorItem({
-  name,
-  action,
-  time,
-}: {
-  name: string;
-  action: string;
-  time: string;
-}) {
-  return (
-    <li className="flex items-start">
-      <div className="flex-1">
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          {name}
-        </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {action}
-        </p>
-      </div>
-      <span className="text-xs text-gray-400 dark:text-gray-500">
-        {time}
-      </span>
-    </li>
-  );
-}
-
-function WorkspaceCard({
+function ConciergeCard({
   title,
   body,
+  button,
   href,
-  cta,
 }: {
   title: string;
   body: string;
+  button: string;
   href: string;
-  cta: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm flex flex-col justify-between">
-      <div>
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-          {title}
-        </h3>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          {body}
-        </p>
+    <CardShell>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          minHeight: 170,
+        }}
+      >
+        <div>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: 20,
+              fontFamily: '"Playfair Display","Gilda Display",serif',
+              fontWeight: 400,
+              color: "#111",
+            }}
+          >
+            {title}
+          </h2>
+          <p
+            style={{
+              marginTop: 8,
+              marginBottom: 16,
+              fontSize: 14,
+              color: "#555",
+            }}
+          >
+            {body}
+          </p>
+        </div>
+        <div>
+          <PillLink href={href}>{button}</PillLink>
+        </div>
       </div>
-      <div className="mt-4">
-        <Link
-          href={href}
-          className="inline-flex items-center px-4 py-2 rounded-full text-xs font-medium bg-emerald-800 text-white hover:bg-emerald-900 transition"
+    </CardShell>
+  );
+}
+
+function StatCard({ title, value, delta }: Stat) {
+  return (
+    <CardShell>
+      <div style={{ fontSize: 13, color: "#666" }}>{title}</div>
+      <div
+        style={{
+          marginTop: 10,
+          fontSize: 34,
+          fontWeight: 700,
+          color: "#111",
+          letterSpacing: -0.4,
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ marginTop: 6, fontSize: 13, color: "#1f7a4d" }}>
+        {delta}
+      </div>
+    </CardShell>
+  );
+}
+
+function Panel({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      style={{
+        borderRadius: 20,
+        backgroundColor: "#ffffff",
+        boxShadow: "0 14px 36px rgba(0,0,0,0.06)",
+        border: "1px solid rgba(24,63,52,0.06)",
+        padding: 24,
+      }}
+    >
+      <h3
+        style={{
+          margin: 0,
+          fontSize: 20,
+          fontFamily: '"Playfair Display","Gilda Display",serif',
+          fontWeight: 400,
+          color: "#111",
+        }}
+      >
+        {title}
+      </h3>
+      {subtitle ? (
+        <p style={{ margin: "10px 0 0 0", fontSize: 14, color: "#666" }}>
+          {subtitle}
+        </p>
+      ) : null}
+      <div style={{ marginTop: 18 }}>{children}</div>
+    </section>
+  );
+}
+
+export default function AdminPage() {
+  const stats: Stat[] = [
+    { title: "New Leads Today", value: "12", delta: "+18 percent" },
+    { title: "Hot Leads", value: "4", delta: "+33 percent" },
+    { title: "Vendors Joined", value: "3", delta: "Stable" },
+    { title: "AI Agent Accuracy", value: "92 percent", delta: "+3 percent" },
+  ];
+
+  const activity: Activity[] = [
+    {
+      name: "Bella Weddings Italy",
+      note: "Submitted application",
+      when: "2h ago",
+    },
+    { name: "Cygnus Events", note: "Updated profile", when: "6h ago" },
+    { name: "MR Music Italy", note: "New inquiry", when: "1d ago" },
+  ];
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#f7f4ef",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1100,
+          margin: "0 auto",
+          padding: 32,
+          fontFamily:
+            '"Nunito Sans",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+        }}
+      >
+        <AdminNav />
+
+        <div style={{ marginTop: 18 }}>
+          <h1
+            style={{
+              fontFamily: '"Gilda Display","Playfair Display",serif',
+              fontSize: 30,
+              fontWeight: 400,
+              letterSpacing: -0.4,
+              color: "#183F34",
+              margin: 0,
+            }}
+          >
+            Concierge workspace
+          </h1>
+          <p
+            style={{
+              margin: "6px 0 0 0",
+              fontSize: 14,
+              color: "#555",
+              maxWidth: 720,
+            }}
+          >
+            Choose how you want to work with your AI concierge, you can review
+            vendor leads, read full conversations, or step into live chat when a
+            human reply is needed.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(260px, 1fr))",
+            gap: 20,
+            marginTop: 16,
+          }}
         >
-          {cta}
-        </Link>
+          <ConciergeCard
+            title="Vendor leads"
+            body="See the vendors your concierge has flagged as promising, update their status, and keep light notes as they move closer to joining 5 Star Weddings."
+            button="Open vendor leads"
+            href="/admin/leads"
+          />
+
+          <ConciergeCard
+            title="Concierge conversations"
+            body="Read full AI chats with couples and vendors, understand their story, then create a vendor lead card directly from any conversation."
+            button="View conversations"
+            href="/admin/conversations"
+          />
+
+          <ConciergeCard
+            title="Live chat takeover"
+            body="Watch live conversations in real time, then step in as a human if a couple or venue needs personal guidance or a more nuanced answer."
+            button="Open live chat"
+            href="/admin/live-chat"
+          />
+        </div>
+
+        <div style={{ marginTop: 28 }}>
+          <h2
+            style={{
+              fontFamily: '"Gilda Display","Playfair Display",serif',
+              fontSize: 34,
+              fontWeight: 400,
+              letterSpacing: -0.4,
+              color: "#111",
+              margin: 0,
+            }}
+          >
+            Dashboard
+          </h2>
+          <p
+            style={{
+              margin: "8px 0 0 0",
+              fontSize: 14,
+              color: "#666",
+              maxWidth: 720,
+            }}
+          >
+            Your AI sales pipeline, vendor activity and performance insights.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(230px, 1fr))",
+            gap: 20,
+            marginTop: 20,
+          }}
+        >
+          {stats.map((s) => (
+            <StatCard key={s.title} title={s.title} value={s.value} delta={s.delta} />
+          ))}
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "2fr 1fr",
+            gap: 20,
+            marginTop: 22,
+          }}
+        >
+          <Panel
+            title="Lead Quality Overview"
+            subtitle="Snapshot of AI graded leads over the past seven days."
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(180px, 1fr))",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  borderRadius: 18,
+                  backgroundColor: "#fbf8f3",
+                  padding: 22,
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 999,
+                    margin: "0 auto",
+                    backgroundColor: "#2fbf71",
+                  }}
+                />
+                <div style={{ marginTop: 12, color: "#666" }}>Hot</div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 28,
+                    fontWeight: 700,
+                    color: "#111",
+                  }}
+                >
+                  9
+                </div>
+              </div>
+
+              <div
+                style={{
+                  borderRadius: 18,
+                  backgroundColor: "#fbf8f3",
+                  padding: 22,
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 999,
+                    margin: "0 auto",
+                    backgroundColor: "#f0a034",
+                  }}
+                />
+                <div style={{ marginTop: 12, color: "#666" }}>Warm</div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 28,
+                    fontWeight: 700,
+                    color: "#111",
+                  }}
+                >
+                  17
+                </div>
+              </div>
+
+              <div
+                style={{
+                  borderRadius: 18,
+                  backgroundColor: "#fbf8f3",
+                  padding: 22,
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 999,
+                    margin: "0 auto",
+                    backgroundColor: "#9aa3ad",
+                  }}
+                />
+                <div style={{ marginTop: 12, color: "#666" }}>Cold</div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 28,
+                    fontWeight: 700,
+                    color: "#111",
+                  }}
+                >
+                  5
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Recent Vendor Activity">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {activity.map((a) => (
+                <div
+                  key={a.name}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 16,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, color: "#111" }}>{a.name}</div>
+                    <div style={{ marginTop: 4, color: "#666", fontSize: 13 }}>
+                      {a.note}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      color: "#999",
+                      fontSize: 13,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {a.when}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+
+        <div
+          style={{
+            marginTop: 32,
+            paddingTop: 12,
+            borderTop: "1px solid #eee2cf",
+            fontSize: 12,
+            color: "#777",
+            textAlign: "right",
+          }}
+        >
+          Powered by{" "}
+          <a
+            href="https://taigenic.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#183F34", textDecoration: "none", fontWeight: 500 }}
+          >
+            Taigenic AI
+          </a>
+        </div>
       </div>
     </div>
   );

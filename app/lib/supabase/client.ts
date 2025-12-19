@@ -1,14 +1,19 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
 
-/**
- * Standard Supabase client for Next.js 16.
- * Standardizing the name to 'createClient' to match your component imports.
- */
-export function createClient() {
-  // We don't need a throw-error helper here because @supabase/ssr 
-  // will warn you if these are missing, but keeping it clean for the build.
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+function mustGetEnv(name: string) {
+  const v = process.env[name]
+  if (!v) throw new Error(`Missing env var: ${name}`)
+  return v
+}
+
+export function createSupabaseBrowserClient() {
+  const url = mustGetEnv("NEXT_PUBLIC_SUPABASE_URL")
+  const anon = mustGetEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  return createClient(url, anon, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  })
 }

@@ -48,7 +48,7 @@
     "**/*.mts",
     "tailwind.config.js",
     "next.config.mjs"
-  ],
+, "middleware.ts-old", "app/admin/dashboard/aura/page.tsx.backup"  ],
 
   "exclude": ["node_modules"]
 }

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { AdminNav } from "../AdminNav";
 
+// Types
 type ConversationRow = {
   id: string;
   user_type: string | null;
@@ -18,21 +18,18 @@ type ConversationRow = {
   contact_phone?: string | null;
 };
 
+// Supabase Init
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
-// Initialize the client (can be null if env vars are missing)
 const supabase: SupabaseClient | null =
   supabaseUrl && supabaseKey
-    ? createClient(supabaseUrl, supabaseKey, {
-        auth: { persistSession: false },
-      })
+    ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
     : null;
 
+/* === HELPER FUNCTIONS === */
 function formatCreated(value: string | null | undefined): string {
   if (!value) return "";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleString("en-GB", {
     day: "2-digit",
     month: "short",
@@ -41,315 +38,255 @@ function formatCreated(value: string | null | undefined): string {
   });
 }
 
-function getTypeLabel(row: ConversationRow): string {
-  if (row.user_type === "vendor") return "Vendor";
-  if (row.user_type === "planning") return "Wedding planner or couple";
-  return "Unknown";
-}
-
-function getStatusLabel(status: string | null | undefined): string {
+function getStatusInfo(status: string | null | undefined) {
   const raw = (status || "").toLowerCase();
-  if (raw === "in_progress") return "In progress";
-  if (raw === "done") return "Done";
-  if (raw === "open" || raw === "new" || raw === "") return "New";
-  return status || "New";
+  if (raw === "in_progress")
+    return {
+      label: "In Progress",
+      bg: "rgba(34, 197, 94, 0.1)",
+      color: "#22C55E",
+    };
+  if (raw === "done")
+    return {
+      label: "Done",
+      bg: "rgba(255, 255, 255, 0.05)",
+      color: "#94A39F",
+    };
+  return {
+    label: "New Intercept",
+    bg: "rgba(197, 160, 89, 0.1)",
+    color: "#C5A059",
+  };
 }
 
-function getStatusColour(status: string | null | undefined): {
-  bg: string;
-  color: string;
-} {
-  const raw = (status || "").toLowerCase();
-  if (raw === "in_progress") return { bg: "#e4f4ea", color: "#1d6b3b" };
-  if (raw === "done") return { bg: "#f1f1f1", color: "#777" };
-  return { bg: "#fff3e6", color: "#cc692b" };
-}
-
-function getSummary(row: ConversationRow): string {
-  const src = row.first_message || row.last_message || "";
-  if (!src) return "No user message found yet.";
-  if (src.length <= 140) return src;
-  return `${src.slice(0, 137)}...`;
-}
-
-function getContactSnippet(row: ConversationRow): string {
-  const bits: string[] = [];
-  if (row.contact_name) bits.push(row.contact_name);
-  if (row.contact_email) bits.push(row.contact_email);
-  if (row.contact_phone) bits.push(row.contact_phone);
-  return bits.join(" · ");
-}
-
+/* === MAIN COMPONENT === */
 export default function LiveChatQueuePage() {
   const [rows, setRows] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    // 1. Capture the global variable
     const sb = supabase;
-
-    // 2. CHECK: If it is null, stop here.
-    if (!sb) {
-      setErrorMessage(
-        "Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
-      );
-      return;
-    }
-    
-    // Now 'sb' is guaranteed to be a SupabaseClient for the rest of this function
-
-    let cancelled = false;
+    if (!sb) return;
 
     async function loadQueue() {
-      // TypeScript knows 'sb' is safe to use here because of the check above
-      if (!sb) return; 
-
       setLoading(true);
-      setErrorMessage("");
-
-      const { data, error } = await sb
+      const { data, error } = await sb!
         .from("conversations")
         .select("*")
         .or("status.is.null,status.eq.new,status.eq.open,status.eq.in_progress")
         .order("updated_at", { ascending: false })
         .limit(50);
 
-      if (cancelled) return;
-
-      if (error) {
-        console.error("live chat queue error", error);
-        setErrorMessage(
-          `Could not load live chat queue: ${
-            (error as any)?.message ?? "Unknown error"
-          }`
-        );
-      } else if (data) {
-        setRows(data as ConversationRow[]);
-      }
-
+      if (error) setErrorMessage(error.message);
+      else if (data) setRows(data as ConversationRow[]);
       setLoading(false);
     }
 
-    void loadQueue();
+    loadQueue();
 
     const channel = sb
       .channel("live-chat-queue")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversations" },
-        (payload) => {
-          setRows((current) => {
-            const newRow = payload.new as ConversationRow | null;
-            const oldRow = payload.old as ConversationRow | null;
-
-            function isActive(row: ConversationRow | null): boolean {
-              if (!row) return false;
-              const raw = (row.status || "").toLowerCase();
-              return (
-                raw === "" ||
-                raw === "new" ||
-                raw === "open" ||
-                raw === "in_progress" ||
-                row.status === null
-              );
-            }
-
-            if (payload.eventType === "INSERT" && newRow) {
-              if (!isActive(newRow)) return current;
-              const exists = current.some((r) => r.id === newRow.id);
-              const merged = exists
-                ? current.map((r) => (r.id === newRow.id ? newRow : r))
-                : [newRow, ...current];
-              return merged.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
-            }
-
-            if (payload.eventType === "UPDATE" && newRow) {
-              const stillActive = isActive(newRow);
-              let next = current;
-
-              if (stillActive) {
-                const exists = current.some((r) => r.id === newRow.id);
-                next = exists
-                  ? current.map((r) => (r.id === newRow.id ? newRow : r))
-                  : [newRow, ...current];
-              } else {
-                next = current.filter((r) => r.id !== newRow.id);
-              }
-
-              return next.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
-            }
-
-            if (payload.eventType === "DELETE" && oldRow) {
-              return current.filter((r) => r.id !== oldRow.id);
-            }
-
-            return current;
-          });
+        () => {
+          loadQueue();
         }
       )
       .subscribe();
 
     return () => {
-      cancelled = true;
       sb.removeChannel(channel);
     };
   }, []);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#f7f4ef",
-        padding: 24,
-      }}
-    >
-      <AdminNav />
-
-      <div
-        style={{
-          maxWidth: 1120,
-          margin: "24px auto 0 auto",
-        }}
-      >
-        <h1
-          style={{
-            fontFamily: '"Playfair Display","Gilda Display",serif',
-            fontSize: 32,
-            fontWeight: 400,
-            letterSpacing: -0.6,
-            margin: 0,
-            color: "#111",
-          }}
-        >
-          Live chat queue
+    <div style={pageContainer}>
+      {/* Header */}
+      <div style={headerSection}>
+        <h1 style={titleStyle}>
+          LIVE CHAT <span style={{ color: "#C5A059" }}>QUEUE</span>
         </h1>
-
-        <p
-          style={{
-            margin: "8px 0 24px 0",
-            fontSize: 14,
-            color: "#666",
-          }}
-        >
-          Chats where users have requested a person or where an admin is already
-          active. Click through to open the full conversation and reply.
+        <p style={subtitleStyle}>
+          Active neural intercepts requiring human intelligence.
         </p>
+      </div>
 
-        {errorMessage && (
-          <div
-            style={{
-              marginBottom: 12,
-              fontSize: 13,
-              color: "#aa1111",
-            }}
-          >
-            {errorMessage}
-          </div>
-        )}
+      {errorMessage && <div style={errorBanner}>{errorMessage}</div>}
 
-        <div
-          style={{
-            borderRadius: 22,
-            backgroundColor: "#ffffff",
-            boxShadow: "0 18px 40px rgba(0,0,0,0.06)",
-            border: "1px solid rgba(24,63,52,0.05)",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "160px 150px minmax(0, 1fr) 140px",
-              padding: "12px 24px",
-              fontSize: 12,
-              color: "#8a8172",
-              borderBottom: "1px solid #f0ebe1",
-            }}
-          >
-            <div>Created</div>
-            <div>Type</div>
-            <div>Summary</div>
-            <div style={{ textAlign: "right" }}>Status</div>
-          </div>
+      <div style={tableContainer}>
+        {/* Table Header */}
+        <div style={tableHeader}>
+          <div>CREATED</div>
+          <div>IDENTITY</div>
+          <div>NEURAL SUMMARY</div>
+          <div style={{ textAlign: "right" }}>STATUS</div>
+        </div>
 
-          {loading && rows.length === 0 && (
-            <div style={{ padding: 20, fontSize: 13, color: "#666" }}>
-              Loading live chats.
-            </div>
-          )}
+        {loading && <div style={loadingText}>Synchronizing data...</div>}
 
-          {!loading && rows.length === 0 && (
-            <div style={{ padding: 20, fontSize: 13, color: "#666" }}>
-              There are no active live chats at the moment.
-            </div>
-          )}
+        {rows.map((row) => {
+          const status = getStatusInfo(row.status);
+          return (
+            <div key={row.id} style={rowStyle}>
+              <div style={timeText}>{formatCreated(row.created_at)}</div>
+              <div style={identityText}>
+                {row.contact_name || "Anonymous Guest"}
+              </div>
 
-          {rows.map((row) => {
-            const statusInfo = getStatusColour(row.status);
-            const contactSnippet = getContactSnippet(row);
-
-            return (
-              <div
-                key={row.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "160px 150px minmax(0, 1fr) 140px",
-                  padding: "14px 24px",
-                  fontSize: 14,
-                  borderTop: "1px solid #f4efe5",
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ color: "#555" }}>{formatCreated(row.created_at)}</div>
-                <div style={{ color: "#333" }}>{getTypeLabel(row)}</div>
-
-                <div>
-                  <div style={{ color: "#222" }}>{getSummary(row)}</div>
-                  {contactSnippet && (
-                    <div style={{ marginTop: 4, fontSize: 12, color: "#777" }}>
-                      Contact: {contactSnippet}
-                    </div>
-                  )}
+              <div style={summaryContainer}>
+                <div style={summaryText}>
+                  {row.first_message || "Aura is processing..."}
                 </div>
+                {row.contact_email && (
+                  <div style={emailText}>{row.contact_email}</div>
+                )}
+              </div>
 
-                <div
+              <div style={actionContainer}>
+                <span
                   style={{
-                    textAlign: "right",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-end",
-                    gap: 6,
+                    ...statusBadge,
+                    backgroundColor: status.bg,
+                    color: status.color,
                   }}
                 >
-                  <span
-                    style={{
-                      padding: "3px 10px",
-                      borderRadius: 999,
-                      fontSize: 12,
-                      backgroundColor: statusInfo.bg,
-                      color: statusInfo.color,
-                    }}
-                  >
-                    {getStatusLabel(row.status)}
-                  </span>
-
-                  <Link
-                    href={`/admin/conversations/${row.id}`}
-                    style={{ fontSize: 12, color: "#183F34", textDecoration: "none" }}
-                  >
-                    Open conversation
-                  </Link>
-                </div>
+                  {status.label}
+                </span>
+                <Link href={`/admin/conversations/${row.id}`} style={openLink}>
+                  INTERCEPT CHAT
+                </Link>
               </div>
-            );
-          })}
-        </div>
-
-        <div style={{ marginTop: 12, fontSize: 11, color: "#999", textAlign: "right" }}>
-          Powered by Taigenic AI
-        </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
+
+/* === LUXURY MIDNIGHT STYLES === */
+
+const pageContainer: React.CSSProperties = {
+  color: "#E0E7E5",
+  padding: "24px",
+};
+
+const headerSection: React.CSSProperties = {
+  marginBottom: "40px",
+};
+
+const titleStyle: React.CSSProperties = {
+  fontFamily: "'Gilda Display', serif",
+  fontSize: "32px",
+  letterSpacing: "3px",
+  margin: 0,
+};
+
+const subtitleStyle: React.CSSProperties = {
+  fontSize: "13px",
+  color: "#94A39F",
+  marginTop: "8px",
+  letterSpacing: "1px",
+};
+
+const tableContainer: React.CSSProperties = {
+  backgroundColor: "#141615",
+  borderRadius: "6px",
+  border: "1px solid rgba(255,255,255,0.05)",
+  overflow: "hidden",
+};
+
+const tableHeader: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "160px 200px 1fr 180px",
+  padding: "16px 24px",
+  fontSize: "10px",
+  fontWeight: 700,
+  letterSpacing: "2px",
+  color: "#94A39F",
+  borderBottom: "1px solid rgba(255,255,255,0.05)",
+  textTransform: "uppercase",
+};
+
+const rowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "160px 200px 1fr 180px",
+  padding: "18px 24px",
+  alignItems: "center",
+  borderBottom: "1px solid rgba(255,255,255,0.03)",
+};
+
+const timeText: React.CSSProperties = {
+  fontSize: "12px",
+  color: "#AEB8B6",
+};
+
+const identityText: React.CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 500,
+  color: "#E0E7E5",
+};
+
+const summaryContainer: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+};
+
+const summaryText: React.CSSProperties = {
+  fontSize: "13px",
+  color: "#C8D0CD",
+  marginBottom: "4px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const emailText: React.CSSProperties = {
+  fontSize: "12px",
+  color: "#7C8784",
+};
+
+const actionContainer: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  alignItems: "center",
+  gap: "8px",
+};
+
+const statusBadge: React.CSSProperties = {
+  padding: "4px 10px",
+  borderRadius: "4px",
+  fontSize: "11px",
+  fontWeight: 600,
+  letterSpacing: "1px",
+  textTransform: "uppercase",
+};
+
+const openLink: React.CSSProperties = {
+  fontSize: "11px",
+  color: "#C5A059",
+  textDecoration: "none",
+  letterSpacing: "1px",
+  border: "1px solid rgba(197,160,89,0.3)",
+  padding: "4px 10px",
+  borderRadius: "4px",
+  transition: "all 0.2s ease",
+};
+
+const loadingText: React.CSSProperties = {
+  padding: "24px",
+  textAlign: "center",
+  color: "#94A39F",
+  fontSize: "13px",
+};
+
+const errorBanner: React.CSSProperties = {
+  backgroundColor: "rgba(255,0,0,0.1)",
+  color: "#ff6b6b",
+  padding: "12px 16px",
+  borderRadius: "6px",
+  marginBottom: "20px",
+  fontSize: "13px",
+};

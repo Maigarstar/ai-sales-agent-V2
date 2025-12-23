@@ -1,172 +1,148 @@
-"use client"
+"use client";
 
-import { useEffect, useState, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Mail, Lock, ArrowRight } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client"; // Ensure this helper exists
+import { Sparkles, ArrowRight, ShieldCheck, Lock, Mail, Loader2 } from "lucide-react";
 
-function safePath(input: string | null) {
-  if (!input) return null
-  if (!input.startsWith("/")) return null
-  if (input.startsWith("//")) return null
-  return input
-}
-
-/**
- * 1. The Core Login Logic Component
- * This component safely uses useSearchParams()
- */
-function LoginForm() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [isRegistering, setIsRegistering] = useState(false)
-
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const supabase = createClient()
-
-  useEffect(() => {
-    const reg = searchParams.get("register")
-    if (reg === "1") setIsRegistering(true)
-  }, [searchParams])
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      const cleanEmail = email.trim().toLowerCase()
-      if (!cleanEmail || !password) {
-        alert("Enter email and password")
-        return
-      }
-
-      const authRes = isRegistering
-        ? await supabase.auth.signUp({
-            email: cleanEmail,
-            password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/login`,
-            },
-          })
-        : await supabase.auth.signInWithPassword({
-            email: cleanEmail,
-            password,
-          })
-
-      if (authRes.error) {
-        alert(authRes.error.message)
-        return
-      }
-
-      if (isRegistering) {
-        router.replace("/onboarding")
-        router.refresh()
-        return
-      }
-
-      const nextParam = safePath(searchParams.get("next"))
-      const redirectedFrom = safePath(searchParams.get("redirectedFrom"))
-      const intended = nextParam || redirectedFrom || "/admin"
-
-      const { data: userData } = await supabase.auth.getUser()
-      const userId = userData?.user?.id
-
-      if (!userId) {
-        router.replace("/admin")
-        router.refresh()
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", userId)
-        .single()
-
-      const isAdmin = !!profile?.is_admin
-
-      if (intended.startsWith("/admin")) {
-        router.replace(isAdmin ? "/admin/dashboard" : "/vendors-chat")
-        router.refresh()
-        return
-      }
-
-      router.replace(intended)
-      router.refresh()
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 border border-gray-100">
-      <div className="text-center mb-8">
-        <h1 className="text-[#1F4D3E] font-serif text-3xl mb-2">5 Star Weddings</h1>
-        <p className="text-gray-500 text-sm">Luxury Concierge Access</p>
-      </div>
-
-      <form onSubmit={handleAuth} className="space-y-4">
-        <div className="relative">
-          <Mail className="absolute left-3 top-3.5 text-gray-400" size={18} />
-          <input
-            type="email"
-            placeholder="Email Address"
-            required
-            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#1F4D3E] outline-none"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-
-        <div className="relative">
-          <Lock className="absolute left-3 top-3.5 text-gray-400" size={18} />
-          <input
-            type="password"
-            placeholder="Password"
-            required
-            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#1F4D3E] outline-none"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-
-        <button
-          disabled={loading}
-          className="w-full py-4 bg-[#1F4D3E] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#163C30] transition-all disabled:opacity-60"
-        >
-          {loading ? "Please wait..." : isRegistering ? "Create Account" : "Sign In"}
-          <ArrowRight size={18} />
-        </button>
-      </form>
-
-      <button
-        type="button"
-        onClick={() => setIsRegistering(!isRegistering)}
-        className="w-full mt-6 text-sm text-gray-500 hover:text-[#1F4D3E]"
-      >
-        {isRegistering ? "Already have an account? Sign In" : "New to 5 Star? Create an Account"}
-      </button>
-    </div>
-  )
-}
-
-/**
- * 2. The Main Page Component
- * This wraps the form in Suspense to fix the build error
- */
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      window.location.href = "/admin"; // Redirect to your fixed Admin dashboard
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Suspense fallback={
-        <div className="p-10 bg-white rounded-3xl shadow-xl border border-gray-100 animate-pulse">
-          <div className="h-8 w-48 bg-gray-200 rounded mx-auto mb-4" />
-          <div className="h-4 w-32 bg-gray-100 rounded mx-auto" />
+    <div style={pageWrapper}>
+      {/* 1. NAVIGATION BAR */}
+      <nav style={navBarStyle}>
+        <div style={logoStyle}>5 STAR WEDDINGS</div>
+        <Link href="/" style={backLink}>Back to Concierge</Link>
+      </nav>
+
+      {/* 2. LOGIN CARD */}
+      <section style={loginSection}>
+        <div style={loginCard}>
+          <div style={auraBadge}>
+            <Sparkles size={14} /> Neural Access Point
+          </div>
+          
+          <h1 style={titleStyle}>MEMBER LOGIN</h1>
+          <p style={subtitleStyle}>Re-entering the 5 Star Weddings ecosystem.</p>
+
+          <form style={formStyle} onSubmit={handleLogin}>
+            {error && <div style={errorBanner}>{error}</div>}
+
+            <div style={inputGroup}>
+              <label style={labelStyle}>IDENTITY (EMAIL)</label>
+              <div style={inputWrapper}>
+                <Mail size={18} style={iconStyle} />
+                <input 
+                  type="email" 
+                  style={inputField} 
+                  required
+                  placeholder="name@boutique.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={inputGroup}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={labelStyle}>NEURAL KEY (PASSWORD)</label>
+                <Link href="/forgot-password" style={forgotLink}>Forgot Key?</Link>
+              </div>
+              <div style={inputWrapper}>
+                <Lock size={18} style={iconStyle} />
+                <input 
+                  type="password" 
+                  style={inputField} 
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <button style={primaryBtn} disabled={loading}>
+              {loading ? (
+                <>AUTHENTICATING... <Loader2 size={18} className="animate-spin" /></>
+              ) : (
+                <>INITIALIZE SESSION <ArrowRight size={18} /></>
+              )}
+            </button>
+          </form>
+
+          <div style={socialProof}>
+            <ShieldCheck size={14} color="var(--aura-gold)" /> 
+            Secured by Aura Voice Systems
+          </div>
         </div>
-      }>
-        <LoginForm />
-      </Suspense>
+      </section>
+
+      {/* 3. HIGH-VISIBILITY BRANDED FOOTER */}
+      <footer style={footerStyle}>
+        <div style={footerDivider}></div>
+        <p style={footerBranding}>
+          © 2025 5 STAR WEDDINGS — CONCIERGE PLATFORM
+        </p>
+        <p style={taigenicBranding}>
+          POWERED BY <span style={{ color: "var(--aura-gold)", fontWeight: 800 }}>TAIGENIC AI</span>
+        </p>
+      </footer>
     </div>
-  )
+  );
 }
+
+/* === BRANDED LOGIN STYLES === */
+const pageWrapper = { backgroundColor: "#0A0C0B", color: "#E0E7E5", minHeight: "100vh", fontFamily: "'Nunito Sans', sans-serif", display: "flex", flexDirection: "column" as const };
+const navBarStyle = { height: "100px", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 60px", borderBottom: "1px solid rgba(255,255,255,0.05)" };
+const logoStyle = { fontFamily: "'Gilda Display', serif", fontSize: "22px", letterSpacing: "3px", color: "var(--aura-gold)" };
+const backLink = { fontSize: "12px", color: "#94A39F", textDecoration: "none", fontWeight: 700, letterSpacing: "1px" };
+
+const loginSection = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" };
+const loginCard = { width: "100%", maxWidth: "460px", backgroundColor: "#141615", padding: "60px", borderRadius: "6px", border: "1px solid rgba(197, 160, 89, 0.2)" };
+
+const auraBadge = { display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", backgroundColor: "rgba(197, 160, 89, 0.1)", color: "var(--aura-gold)", borderRadius: "6px", fontSize: "10px", fontWeight: "700", letterSpacing: "2px", marginBottom: "32px", width: 'fit-content', margin: '0 auto 32px' };
+const titleStyle = { textAlign: 'center' as const, fontFamily: "'Gilda Display', serif", fontSize: "36px", marginBottom: "12px", letterSpacing: "2px" };
+const subtitleStyle = { textAlign: 'center' as const, fontSize: "14px", color: "#94A39F", marginBottom: "48px" };
+
+const errorBanner = { backgroundColor: "rgba(255, 100, 100, 0.1)", color: "#FF6B6B", padding: "12px", borderRadius: "6px", fontSize: "13px", marginBottom: "20px", border: "1px solid rgba(255, 100, 100, 0.2)" };
+const formStyle = { display: "flex", flexDirection: "column" as const, gap: "24px" };
+const inputGroup = { textAlign: "left" as const };
+const labelStyle = { fontSize: "10px", fontWeight: "800", color: "#666", letterSpacing: "1.5px", marginBottom: "10px", display: "block" };
+const forgotLink = { fontSize: "10px", color: "var(--aura-gold)", textDecoration: "none", fontWeight: 700 };
+
+const inputWrapper = { position: "relative" as const, display: "flex", alignItems: "center" };
+const iconStyle = { position: "absolute" as const, left: "15px", color: "rgba(197, 160, 89, 0.5)" };
+const inputField = { width: "100%", padding: "18px 18px 18px 50px", backgroundColor: "#0A0C0B", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "6px", color: "#FFF", fontSize: "15px", outline: "none" };
+
+const primaryBtn = { cursor: 'pointer', border: 'none', padding: "20px", backgroundColor: "var(--aura-gold)", color: "#112620", borderRadius: "6px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", fontSize: "14px", marginTop: "10px", transition: 'opacity 0.2s' };
+
+const socialProof = { fontSize: "11px", color: "#666", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginTop: "32px" };
+
+/* === HIGH-VISIBILITY FOOTER === */
+const footerStyle = { padding: "60px 40px", textAlign: "center" as const, borderTop: "1px solid rgba(255,255,255,0.05)", backgroundColor: "#080A09" };
+const footerDivider = { width: "40px", height: "1px", backgroundColor: "var(--aura-gold)", margin: "0 auto 30px", opacity: 0.5 };
+const footerBranding = { fontSize: "11px", color: "#94A39F", letterSpacing: "1px", marginBottom: "8px" };
+const taigenicBranding = { fontSize: "13px", color: "#E0E7E5", letterSpacing: "2px", fontWeight: 500 };

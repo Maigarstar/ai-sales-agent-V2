@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-sidebar: #2D312F;
+  --bg-main: #FDFCFB;
+  --text-primary: #112620;
+  --aura-gold: #C5A059;
+  --border: rgba(0,0,0,0.08);
+  /* Sharp Luxury Radius */
+  --radius-luxury: 6px; 
+}
+
+[data-theme='dark'] {
+  --bg-sidebar: #1A1C1B;
+  --bg-main: #0C1110;
+  --text-primary: #E0E7E5;
+  --border: rgba(255,255,255,0.05);
+}
+
 body {
-  @apply bg-gray-100 text-gray-800;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  margin: 0;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.luxury-serif { font-family: 'Gilda Display', serif; }
+
+/* Apply sharp edges to all inputs and buttons site-wide */
+input, select, textarea, button {
+  border-radius: var(--radius-luxury) !important;
 }

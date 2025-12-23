@@ -3,11 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { AudioLines } from "lucide-react";
 
-type Props = {
+type AuraVoiceProps = {
   className?: string;
+  onStart?: () => void;
+  onStop?: () => void;
+  onError?: (err: string) => void;
 };
 
-export default function AuraVoice(props: Props) {
+export default function AuraVoice({
+  className,
+  onStart,
+  onStop,
+  onError,
+}: AuraVoiceProps) {
   const [active, setActive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hadError, setHadError] = useState(false);
@@ -34,19 +42,15 @@ export default function AuraVoice(props: Props) {
 
       const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = localStream;
-
-      for (const track of localStream.getTracks()) {
-        pc.addTrack(track, localStream);
-      }
+      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      const sdpOffer = pc.localDescription?.sdp || "";
       const res = await fetch("/api/voice", {
         method: "POST",
         headers: { "Content-Type": "application/sdp" },
-        body: sdpOffer,
+        body: offer.sdp || "",
       });
 
       if (!res.ok) {
@@ -58,9 +62,11 @@ export default function AuraVoice(props: Props) {
       await pc.setRemoteDescription({ type: "answer", sdp: sdpAnswer });
 
       setActive(true);
-    } catch (e) {
+      onStart?.();
+    } catch (e: any) {
       console.error("AuraVoice start error", e);
       setHadError(true);
+      onError?.(e.message || "Voice connection failed");
       stop();
     } finally {
       setBusy(false);
@@ -90,6 +96,7 @@ export default function AuraVoice(props: Props) {
 
     setActive(false);
     setBusy(false);
+    onStop?.();
   }
 
   function toggle() {
@@ -105,38 +112,39 @@ export default function AuraVoice(props: Props) {
   return (
     <>
       <audio ref={audioRef} autoPlay className="hidden" />
-
       <button
         type="button"
         onClick={toggle}
         disabled={busy}
-        aria-label={active ? "Turn on off" : "Turn on on"}
+        aria-label={active ? "Turn off voice" : "Turn on voice"}
         aria-pressed={active}
         title={
           hadError
             ? "Microphone permission needed"
             : active
-              ? "On"
-              : "Off"
+            ? "Voice active"
+            : "Start voice chat"
         }
         className={[
-          "relative h-11 w-11 rounded-full flex items-center justify-center shadow-sm transition active:scale-95",
+          "relative h-11 w-11 rounded-full flex items-center justify-center transition active:scale-95 shadow-sm",
           active
-            ? "bg-black text-white"
+            ? "bg-[#183F34] text-[#C5A059]"
             : "bg-white text-gray-900 border border-gray-200",
-          hadError ? "border border-red-300" : "",
+          hadError ? "border border-red-400" : "",
           busy ? "opacity-60 cursor-not-allowed" : "opacity-100",
-          props.className || "",
+          className || "",
         ].join(" ")}
       >
         {active && (
           <span
             aria-hidden="true"
-            className="absolute inset-0 rounded-full bg-black/15 animate-ping"
+            className="absolute inset-0 rounded-full bg-[#C5A059]/20 animate-ping"
           />
         )}
-
-        <AudioLines size={18} className={active ? "opacity-95" : "opacity-70"} />
+        <AudioLines
+          size={18}
+          className={active ? "opacity-100" : "opacity-70"}
+        />
       </button>
     </>
   );

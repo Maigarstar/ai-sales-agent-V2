@@ -1,73 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import React, { useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
-import { User, Store, Check } from "lucide-react";
 
-export default function OnboardingPage() {
-  const [role, setRole] = useState<"couple" | "vendor">("couple");
+export default function SaaSOnboarding() {
+  const [role, setRole] = useState<"Vendor" | "Couple">("Vendor");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
   const router = useRouter();
 
-  const saveProfile = async () => {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const finalizeIdentity = async () => {
+    setIsSyncing(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
 
-    const { error } = await supabase.from('profiles').upsert({
-      id: user.id,
-      full_name: name,
-      phone_number: phone,
-      user_type: role,
-      onboarding_complete: true,
-      updated_at: new Date()
-    });
+    if (user) {
+      // Create the production profile
+      await supabase.from("profiles").upsert({
+        id: user.id,
+        role: role,
+        display_name: name,
+        onboarding_completed: false,
+        created_at: new Date().toISOString()
+      });
 
-    if (!error) router.push("/wedding-concierge");
+      // Direct to role-specific Neural Training
+      router.push(role === "Vendor" ? "/dashboard/brand-voice" : "/dashboard/wedding-vision");
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-lg w-full bg-white rounded-3xl shadow-sm p-8 border border-gray-100">
-        <h2 className="text-2xl font-serif text-[#1F4D3E] text-center mb-6">Tell us about yourself</h2>
+    <div style={canvasStyle}>
+      <div style={membershipCard}>
+        <div style={toggleWrapper}>
+           <button onClick={() => setRole("Vendor")} style={role === "Vendor" ? activeTab : tab}>Vendor</button>
+           <button onClick={() => setRole("Couple")} style={role === "Couple" ? activeTab : tab}>Couple</button>
+        </div>
         
-        <div className="flex gap-4 mb-8">
-          <button 
-            onClick={() => setRole("couple")}
-            className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${role === 'couple' ? 'border-[#1F4D3E] bg-green-50' : 'border-gray-100'}`}
-          >
-            <User size={24} className={role === 'couple' ? 'text-[#1F4D3E]' : 'text-gray-400'} />
-            <span className="font-bold text-sm">I'm a Couple</span>
-          </button>
-          <button 
-            onClick={() => setRole("vendor")}
-            className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${role === 'vendor' ? 'border-[#1F4D3E] bg-green-50' : 'border-gray-100'}`}
-          >
-            <Store size={24} className={role === 'vendor' ? 'text-[#1F4D3E]' : 'text-gray-400'} />
-            <span className="font-bold text-sm">I'm a Vendor</span>
-          </button>
+        <h1 style={gildaTitle}>The Membership</h1>
+        <p style={subtext}>Initialize your presence in the 5-Star Collection.</p>
+
+        <div style={formGroup}>
+          <label style={labelStyle}>{role === "Vendor" ? "BUSINESS NAME" : "FULL NAMES"}</label>
+          <input 
+            style={textInput} 
+            placeholder="e.g. LoveExposed" 
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </div>
 
-        <div className="space-y-4">
-          <input 
-            placeholder="Full Name" 
-            className="w-full p-3 bg-gray-50 border rounded-xl outline-none"
-            value={name} onChange={(e) => setName(e.target.value)}
-          />
-          <input 
-            placeholder="Phone Number" 
-            className="w-full p-3 bg-gray-50 border rounded-xl outline-none"
-            value={phone} onChange={(e) => setPhone(e.target.value)}
-          />
-          <button 
-            onClick={saveProfile}
-            className="w-full py-4 bg-[#1F4D3E] text-white rounded-xl font-bold hover:bg-[#163C30]"
-          >
-            Finish Setup
-          </button>
-        </div>
+        <button onClick={finalizeIdentity} disabled={!name || isSyncing} style={primaryBtn}>
+          {isSyncing ? "SYNCING NEURAL IDENTITY..." : "CONTINUE TO IDENTITY →"}
+        </button>
       </div>
     </div>
   );
 }
+
+/* PRODUCTION STYLES */
+const canvasStyle = { backgroundColor: "#F9F9F9", minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center" };
+const membershipCard = { backgroundColor: "#FFF", padding: "60px", borderRadius: "40px", width: "100%", maxWidth: "550px", boxShadow: "0 20px 50px rgba(0,0,0,0.04)" };
+const gildaTitle = { fontFamily: "'Gilda Display', serif", fontSize: "42px", color: "#1D352F", marginBottom: "12px", textAlign: "center" as const };
+const toggleWrapper = { display: "flex", background: "#F1F1F0", borderRadius: "100px", padding: "5px", marginBottom: "40px" };
+const tab = { flex: 1, padding: "12px", border: "none", background: "none", cursor: "pointer", fontWeight: 700, color: "#6F6A67" };
+const activeTab = { ...tab, background: "#1D352F", color: "#FFF", borderRadius: "100px" };
+const primaryBtn = { width: "100%", padding: "20px", background: "#1D352F", color: "#FFF", border: "none", borderRadius: "12px", fontWeight: 700, cursor: "pointer" };
+const textInput = { width: "100%", padding: "18px", borderRadius: "10px", border: "1px solid #EAE7E3", marginTop: "10px", fontSize: "16px" };
+const labelStyle = { fontSize: "10px", fontWeight: 800, color: "#999", letterSpacing: "1px" };
+const subtext = { textAlign: "center" as const, color: "#6F6A67", marginBottom: "40px", fontSize: "14px" };
+const formGroup = { marginBottom: "30px" };

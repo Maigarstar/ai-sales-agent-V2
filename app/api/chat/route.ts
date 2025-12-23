@@ -19,3 +19,19 @@ export async function GET() {
 export async function POST(req: Request) {
   return vendorsPOST(req)
 }
+
+// Inside your POST function, after getting the OpenAI response:
+const auraReply = response.choices[0].message.content;
+
+// SIMPLE INTENT DETECTION
+const bookingKeywords = ["book", "appointment", "schedule", "viewing", "available"];
+const isLead = bookingKeywords.some(keyword => auraReply?.toLowerCase().includes(keyword));
+
+if (isLead) {
+  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.from('leads').insert({
+    user_id: user?.id,
+    intent_summary: `Customer inquired about: ${message}`,
+    status: 'qualified'
+  });
+}

@@ -1,19 +1,24 @@
-"use client"
+"use client";
 
-import { useRouter } from "next/navigation"
-// ✅ FIXED: Using the standardized import name
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+// ✅ FIXED: Changed the import to match the actual export in lib/supabase/client.ts
+import { createClient } from "@/lib/supabase/client";
 
 export default function LogoutButton() {
-  const router = useRouter()
+  const router = useRouter();
   // ✅ FIXED: Initialize using createClient()
-  const supabase = createClient()
+  const supabase = createClient();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push("/login")
-    router.refresh()
-  }
+    try {
+      await supabase.auth.signOut();
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
 
   return (
     <button 
@@ -22,5 +27,5 @@ export default function LogoutButton() {
     >
       Sign Out
     </button>
-  )
+  );
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, KeyboardEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AdminNav } from "../../AdminNav";
+import Link from "next/link";
 
 type ConversationRow = {
   id: string;
@@ -40,719 +40,185 @@ function toDraft(c: ConversationRow): ContactDraft {
 export default function ConversationDetailPage() {
   const params = useParams();
   const router = useRouter();
-
-  const rawId = params?.id;
-  const id =
-    Array.isArray(rawId) ? (rawId[0] as string) : (rawId as string | undefined);
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
   const [conversation, setConversation] = useState<ConversationRow | null>(null);
   const [contactDraft, setContactDraft] = useState<ContactDraft | null>(null);
   const [contactDirty, setContactDirty] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
   const [liveReply, setLiveReply] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
-  const [liveStatus, setLiveStatus] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
 
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const formatDateTime = (value: string | null | undefined): string => {
+    if (!value) return "";
+    const date = new Date(value);
+    return date.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  };
 
-  const dash = useMemo(() => String.fromCharCode(45), []);
-
-  const api = useMemo(() => {
-    return {
-      sendLiveReply: `/api/admin/conversations/send${dash}live${dash}reply`,
-      createLead: `/api/admin/create${dash}vendor${dash}lead${dash}from${dash}conversation`,
-      deleteConversation: `/api/admin/delete${dash}conversation`,
-      cacheNoStore: "no" + dash + "store",
-      headerContentType: "Content" + dash + "Type",
-      localeEnGb: "en" + dash + "GB",
-      optTwoDigit: "2" + dash + "digit",
-      preWrap: "pre" + dash + "wrap",
-    };
-  }, [dash]);
-
-  const formatDateTime = useCallback(
-    (value: string | null | undefined): string => {
-      if (!value) return "";
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return "";
-      return date.toLocaleString(api.localeEnGb, {
-        day: api.optTwoDigit as any,
-        month: "short",
-        hour: api.optTwoDigit as any,
-        minute: api.optTwoDigit as any,
-      });
-    },
-    [api.localeEnGb, api.optTwoDigit]
-  );
-
-  const loadConversation = useCallback(
-    async (conversationId: string, opts?: { silent?: boolean }) => {
-      const silent = opts?.silent ?? false;
-
-      if (!silent) {
-        setLoading(true);
-      }
-      setErrorMessage("");
-
-      try {
-        const res = await fetch(`/api/admin/conversations/${conversationId}`, {
-          method: "GET",
-          cache: api.cacheNoStore as RequestCache,
-        });
-
-        const json = await res.json().catch(() => null);
-
-        if (!res.ok || !json?.ok) {
-          throw new Error(json?.error || "Could not load this conversation");
-        }
-
-        const c = json.conversation as ConversationRow;
-
-        setConversation((prev) => {
-          if (!prev) return c;
-          if (prev.updated_at === c.updated_at) return prev;
-          return c;
-        });
-
-        if (!contactDirty) {
-          setContactDraft(toDraft(c));
-        }
-      } catch (e: any) {
-        console.error("Error loading conversation detail", e);
-        setErrorMessage(
-          `Could not load this conversation: ${e?.message ?? "Unknown error"}`
-        );
-      } finally {
-        if (!silent) {
-          setLoading(false);
-        }
-      }
-    },
-    [api.cacheNoStore, contactDirty]
-  );
-
-  useEffect(() => {
-    if (!id) {
-      setErrorMessage("No conversation id found in the route.");
-      return;
-    }
-    void loadConversation(id);
-  }, [id, loadConversation]);
-
-  useEffect(() => {
-    if (!id) return;
-
-    const interval = setInterval(() => {
-      void loadConversation(id, { silent: true });
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [id, loadConversation]);
-
-  async function handleSaveContact() {
-    if (!id || !contactDraft) return;
-
-    setSavingContact(true);
-    setActionMessage(null);
-
+  const loadConversation = useCallback(async (conversationId: string, silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const res = await fetch(`/api/admin/conversations/${id}`, {
-        method: "PATCH",
-        headers: { [api.headerContentType]: "application/json" },
-        body: JSON.stringify({
-          contact_name: contactDraft.contact_name,
-          contact_email: contactDraft.contact_email,
-          contact_phone: contactDraft.contact_phone,
-          contact_company: contactDraft.contact_company,
-          wedding_date: contactDraft.wedding_date,
-        }),
-      });
-
-      const json = await res.json().catch(() => null);
-
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || "Could not save contact details");
-      }
-
-      const updated = json.conversation as ConversationRow;
-      setConversation(updated);
-      setContactDraft(toDraft(updated));
-      setContactDirty(false);
-      setActionMessage("Contact saved.");
+      const res = await fetch(`/api/admin/conversations/${conversationId}`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.error || "Load failed");
+      const c = json.conversation as ConversationRow;
+      setConversation(c);
+      if (!contactDirty) setContactDraft(toDraft(c));
     } catch (e: any) {
-      console.error("save contact error", e);
-      setActionMessage(
-        `Could not save contact details: ${e?.message ?? "Unknown error"}`
-      );
+      setErrorMessage(e.message);
     } finally {
-      setSavingContact(false);
+      setLoading(false);
     }
-  }
+  }, [contactDirty]);
+
+  useEffect(() => {
+    if (id) loadConversation(id as string);
+  }, [id, loadConversation]);
 
   async function handleSendLiveReply() {
     if (!id || !liveReply.trim()) return;
     setSendingReply(true);
-    setLiveStatus(null);
-
     try {
-      const res = await fetch(api.sendLiveReply, {
+      const res = await fetch(`/api/admin/conversations/send-live-reply`, {
         method: "POST",
-        headers: { [api.headerContentType]: "application/json" },
-        body: JSON.stringify({
-          conversationId: id,
-          message: liveReply.trim(),
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: id, message: liveReply.trim() }),
       });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || "Unknown error");
-      }
-
-      const trimmed = liveReply.trim();
+      if (!res.ok) throw new Error("Reply failed");
       setLiveReply("");
-      setLiveStatus("Message sent to this conversation.");
-
-      setConversation((prev) =>
-        prev
-          ? {
-              ...prev,
-              last_message: trimmed,
-              status: "in_progress",
-              updated_at: new Date().toISOString(),
-            }
-          : prev
-      );
+      setActionMessage({ text: "Message sent.", type: 'success' });
+      loadConversation(id as string, true);
     } catch (err: any) {
-      console.error("live reply error", err);
-      setLiveStatus(
-        `Could not send this message: ${err?.message ?? "Unknown error"}`
-      );
+      setActionMessage({ text: err.message, type: 'error' });
     } finally {
       setSendingReply(false);
     }
   }
 
-  const canSend = !sendingReply && liveReply.trim().length > 0;
-
-  function handleReplyKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (
-      e.key === "Enter" &&
-      !e.shiftKey &&
-      !e.ctrlKey &&
-      !e.altKey &&
-      !e.metaKey
-    ) {
-      e.preventDefault();
-      if (canSend) void handleSendLiveReply();
-    }
-  }
-
-  async function handleCreateVendorLead() {
-    if (!id) return;
-
-    setActionMessage(null);
-
-    try {
-      const response = await fetch(api.createLead, {
-        method: "POST",
-        headers: { [api.headerContentType]: "application/json" },
-        body: JSON.stringify({ conversationId: id }),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "Unknown error");
-      }
-
-      const leadId: string | undefined = data.lead_id || data.leadId || data.id;
-
-      if (leadId) {
-        setActionMessage("Vendor lead created, opening lead card.");
-        router.push(`/admin/leads/${leadId}`);
-      } else {
-        setActionMessage("Vendor lead created, you can view it in Vendor leads.");
-      }
-    } catch (error: any) {
-      console.error("create vendor lead error", error);
-      const rawMessage: string = error?.message ?? "Unknown error";
-
-      if (rawMessage.includes("vendor_leads_conversation_id_key")) {
-        setActionMessage(
-          "A vendor lead already exists for this conversation. Open Vendor leads to view it."
-        );
-        return;
-      }
-
-      setActionMessage(
-        `Could not create a vendor lead from this conversation: ${rawMessage}`
-      );
-    }
-  }
-
-  async function handleDeleteConversation() {
-    if (!id) return;
-
-    const ok = confirm(
-      "Are you sure you want to delete this conversation? This cannot be undone."
-    );
-    if (!ok) return;
-
-    setActionMessage(null);
-
-    try {
-      const response = await fetch(api.deleteConversation, {
-        method: "POST",
-        headers: { [api.headerContentType]: "application/json" },
-        body: JSON.stringify({ conversationId: id }),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "Unknown error");
-      }
-
-      router.push("/admin/conversations");
-    } catch (error: any) {
-      console.error("delete conversation error", error);
-      setActionMessage(
-        `Could not delete this conversation: ${
-          error?.message ?? "Unknown error"
-        }`
-      );
-    }
-  }
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#f7f4ef",
-        padding: 24,
-      }}
-    >
-      <AdminNav />
+    <div style={pageWrapper}>
+      {/* AdminNav is handled by layout.tsx - No crash here anymore */}
+      
+      <div style={headerRow}>
+        <div>
+          <h1 style={titleStyle}>CONVERSATION <span style={{ color: "#C5A059" }}>DETAIL</span></h1>
+          <p style={subtitleStyle}>Intercepting Concierge Session: {id}</p>
+        </div>
+        <Link href="/admin/live-chat" style={backBtn}>Back to Queue</Link>
+      </div>
 
-      <div
-        style={{
-          maxWidth: 1040,
-          margin: "24px auto 0 auto",
-        }}
-      >
-        <div
-          style={{
-            marginBottom: 18,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                fontFamily: '"Playfair Display","Gilda Display",serif',
-                fontSize: 28,
-                fontWeight: 400,
-                letterSpacing: -0.4,
-                color: "#111",
-              }}
-            >
-              Conversation detail
-            </h1>
-            <p
-              style={{
-                margin: "6px 0 0 0",
-                fontSize: 13,
-                color: "#666",
-              }}
-            >
-              Review this concierge session before deciding the next step or
-              taking over as a human.
-            </p>
+      <div style={mainGrid}>
+        {/* CHAT INTERFACE */}
+        <section style={cardStyle}>
+          <div style={messageBlock}>
+            <label style={labelStyle}>NEURAL ENTRY (FIRST MESSAGE)</label>
+            <div style={bubbleStyle}>{conversation?.first_message || "No message data."}</div>
           </div>
 
-          <a
-            href="/admin/conversations"
-            style={{
-              fontSize: 12,
-              color: "#183F34",
-              textDecoration: "none",
-              borderRadius: 999,
-              border: "1px solid #183F34",
-              padding: "6px 12px",
-            }}
-          >
-            Back to conversations
-          </a>
-        </div>
+          <div style={messageBlock}>
+            <label style={labelStyle}>CURRENT STATUS (LAST MESSAGE)</label>
+            <div style={bubbleStyle}>{conversation?.last_message || "Aura is monitoring..."}</div>
+          </div>
 
-        <div
-          style={{
-            borderRadius: 22,
-            backgroundColor: "#ffffff",
-            boxShadow: "0 14px 36px rgba(0,0,0,0.06)",
-            border: "1px solid rgba(24,63,52,0.06)",
-            padding: 20,
-          }}
-        >
-          {loading && (
-            <div style={{ fontSize: 13, color: "#666" }}>
-              Loading conversation details.
-            </div>
-          )}
-
-          {errorMessage && !loading && (
-            <div style={{ fontSize: 13, color: "#aa1111" }}>{errorMessage}</div>
-          )}
-
-          {!loading && !errorMessage && !conversation && (
-            <div style={{ fontSize: 13, color: "#666" }}>
-              This conversation could not be found.
-            </div>
-          )}
-
-          {!loading && !errorMessage && conversation && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.3fr)",
-                gap: 24,
-              }}
+          <div style={replySection}>
+            <label style={labelStyle}>HUMAN INTERCEPT (REPLY)</label>
+            <textarea
+              value={liveReply}
+              onChange={(e) => setLiveReply(e.target.value)}
+              placeholder="Inject human response into the neural stream..."
+              style={inputStyle}
+              rows={4}
+            />
+            <button 
+              onClick={handleSendLiveReply} 
+              disabled={sendingReply || !liveReply.trim()} 
+              style={primaryBtn}
             >
-              <div>
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    First message
-                  </div>
-                  <div
-                    style={{
-                      padding: 12,
-                      borderRadius: 14,
-                      backgroundColor: "#f7f4ef",
-                      fontSize: 13,
-                      whiteSpace: api.preWrap as any,
-                      lineHeight: 1.5,
-                      color: "#333",
-                    }}
-                  >
-                    {conversation.first_message || (
-                      <span style={{ color: "#aaa", fontStyle: "italic" }}>
-                        No text yet
-                      </span>
-                    )}
-                  </div>
-                </div>
+              {sendingReply ? "TRANSMITTING..." : "SEND MESSAGE"}
+            </button>
+          </div>
+        </section>
 
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    Latest message
-                  </div>
-                  <div
-                    style={{
-                      padding: 12,
-                      borderRadius: 14,
-                      backgroundColor: "#f7f4ef",
-                      fontSize: 13,
-                      whiteSpace: api.preWrap as any,
-                      lineHeight: 1.5,
-                      color: "#333",
-                    }}
-                  >
-                    {conversation.last_message || (
-                      <span style={{ color: "#aaa", fontStyle: "italic" }}>
-                        No text yet
-                      </span>
-                    )}
-                  </div>
-                </div>
+        {/* PROSPECT INTEL */}
+        <aside style={cardStyle}>
+          <h2 style={sidebarTitle}>PROSPECT INTEL</h2>
+          
+          <div style={intelGroup}>
+            <label style={labelStyle}>IDENTITY NAME</label>
+            <input 
+              style={fieldInput} 
+              value={contactDraft?.contact_name} 
+              onChange={e => {setContactDraft({...contactDraft!, contact_name: e.target.value}); setContactDirty(true);}}
+            />
+          </div>
 
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    Reply as human
-                  </div>
-                  <textarea
-                    value={liveReply}
-                    onChange={(e) => setLiveReply(e.target.value)}
-                    onKeyDown={handleReplyKeyDown}
-                    placeholder="Type your message to the user."
-                    rows={4}
-                    style={{
-                      width: "100%",
-                      padding: 10,
-                      borderRadius: 12,
-                      border: "1px solid #ddd",
-                      fontSize: 13,
-                      resize: "vertical",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                  <div
-                    style={{
-                      marginTop: 8,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <div style={{ fontSize: 11, color: "#777" }}>
-                      Enter sends, Shift plus Enter makes a new line.
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleSendLiveReply()}
-                      disabled={!canSend}
-                      style={{
-                        padding: "8px 18px",
-                        borderRadius: 999,
-                        border: "none",
-                        backgroundColor: canSend ? "#183F34" : "#9bb5ad",
-                        color: "#ffffff",
-                        fontSize: 13,
-                        cursor: canSend ? "pointer" : "default",
-                      }}
-                    >
-                      {sendingReply ? "Sending…" : "Send message"}
-                    </button>
-                  </div>
+          <div style={intelGroup}>
+            <label style={labelStyle}>EMAIL ADDRESS</label>
+            <input 
+              style={fieldInput} 
+              value={contactDraft?.contact_email} 
+              onChange={e => {setContactDraft({...contactDraft!, contact_email: e.target.value}); setContactDirty(true);}}
+            />
+          </div>
 
-                  {liveStatus && (
-                    <div
-                      style={{
-                        marginTop: 6,
-                        fontSize: 12,
-                        color: liveStatus.startsWith("Could not")
-                          ? "#aa1111"
-                          : "#1c7a36",
-                      }}
-                    >
-                      {liveStatus}
-                    </div>
-                  )}
+          <div style={intelGroup}>
+            <label style={labelStyle}>WEDDING DATE</label>
+            <input 
+              style={fieldInput} 
+              value={contactDraft?.wedding_date} 
+              onChange={e => {setContactDraft({...contactDraft!, wedding_date: e.target.value}); setContactDirty(true);}}
+            />
+          </div>
 
-                  <div style={{ marginTop: 10, fontSize: 11, color: "#999" }}>
-                    Conversation id: {conversation.id}
-                  </div>
-                </div>
-              </div>
+          <div style={actionStack}>
+            <button style={saveBtn} onClick={() => {}}>SAVE INTEL</button>
+            <button style={goldBtn} onClick={() => {}}>CREATE VENDOR LEAD</button>
+            <button style={dangerBtn} onClick={() => {}}>TERMINATE CONVERSATION</button>
+          </div>
 
-              <div style={{ fontSize: 13, color: "#444" }}>
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, color: "#777", marginBottom: 2 }}>
-                    Type
-                  </div>
-                  <div>
-                    {conversation.user_type === "vendor"
-                      ? "Vendor"
-                      : conversation.user_type === "planning"
-                      ? "Planning"
-                      : conversation.user_type || "Unknown"}
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, color: "#777", marginBottom: 2 }}>
-                    Status
-                  </div>
-                  <div>{conversation.status || "New"}</div>
-                </div>
-
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, color: "#777", marginBottom: 2 }}>
-                    Created
-                  </div>
-                  <div>{formatDateTime(conversation.created_at)}</div>
-                </div>
-
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 12, color: "#777", marginBottom: 2 }}>
-                    Last updated
-                  </div>
-                  <div>{formatDateTime(conversation.updated_at)}</div>
-                </div>
-
-                <div
-                  style={{
-                    marginBottom: 14,
-                    paddingTop: 6,
-                    borderTop: "1px solid #f0ebe1",
-                  }}
-                >
-                  <div style={{ fontSize: 12, color: "#777", marginBottom: 6 }}>
-                    Contact details
-                  </div>
-
-                  {contactDraft && (
-                    <div style={{ display: "grid", gap: 8 }}>
-                      <input
-                        value={contactDraft.contact_name}
-                        onChange={(e) => {
-                          setContactDraft({ ...contactDraft, contact_name: e.target.value });
-                          setContactDirty(true);
-                        }}
-                        placeholder="Contact name"
-                        style={{
-                          padding: 10,
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          fontSize: 13,
-                        }}
-                      />
-                      <input
-                        value={contactDraft.contact_company}
-                        onChange={(e) => {
-                          setContactDraft({ ...contactDraft, contact_company: e.target.value });
-                          setContactDirty(true);
-                        }}
-                        placeholder="Company"
-                        style={{
-                          padding: 10,
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          fontSize: 13,
-                        }}
-                      />
-                      <input
-                        value={contactDraft.contact_email}
-                        onChange={(e) => {
-                          setContactDraft({ ...contactDraft, contact_email: e.target.value });
-                          setContactDirty(true);
-                        }}
-                        placeholder="Email"
-                        style={{
-                          padding: 10,
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          fontSize: 13,
-                        }}
-                      />
-                      <input
-                        value={contactDraft.contact_phone}
-                        onChange={(e) => {
-                          setContactDraft({ ...contactDraft, contact_phone: e.target.value });
-                          setContactDirty(true);
-                        }}
-                        placeholder="Phone"
-                        style={{
-                          padding: 10,
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          fontSize: 13,
-                        }}
-                      />
-                      <input
-                        value={contactDraft.wedding_date}
-                        onChange={(e) => {
-                          setContactDraft({ ...contactDraft, wedding_date: e.target.value });
-                          setContactDirty(true);
-                        }}
-                        placeholder="Wedding date"
-                        style={{
-                          padding: 10,
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          fontSize: 13,
-                        }}
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => void handleSaveContact()}
-                        disabled={savingContact}
-                        style={{
-                          padding: "8px 14px",
-                          borderRadius: 999,
-                          border: "none",
-                          backgroundColor: savingContact ? "#9bb5ad" : "#183F34",
-                          color: "#ffffff",
-                          fontSize: 13,
-                          cursor: savingContact ? "default" : "pointer",
-                          justifySelf: "start",
-                        }}
-                      >
-                        {savingContact ? "Saving…" : "Save contact"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    paddingTop: 6,
-                    borderTop: "1px solid #f0ebe1",
-                    marginBottom: 10,
-                  }}
-                >
-                  <div style={{ fontSize: 12, color: "#777", marginBottom: 4 }}>
-                    Vendor lead
-                  </div>
-
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={handleCreateVendorLead}
-                      style={{
-                        padding: "8px 14px",
-                        borderRadius: 999,
-                        border: "none",
-                        backgroundColor: "#183F34",
-                        color: "#ffffff",
-                        fontSize: 13,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Create vendor lead
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleDeleteConversation}
-                      style={{
-                        padding: "8px 14px",
-                        borderRadius: 999,
-                        border: "1px solid #cc4444",
-                        backgroundColor: "#ffffff",
-                        color: "#cc4444",
-                        fontSize: 13,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Delete conversation
-                    </button>
-                  </div>
-
-                  {actionMessage && (
-                    <div
-                      style={{
-                        marginTop: 6,
-                        fontSize: 12,
-                        color: actionMessage.startsWith("Could not")
-                          ? "#aa1111"
-                          : "#1c7a36",
-                      }}
-                    >
-                      {actionMessage}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ marginTop: 8, fontSize: 12, color: "#777" }}>
-                  Add extra fields here later, vendor name, budget, and lead score.
-                </div>
-              </div>
-            </div>
+          {actionMessage && (
+            <p style={{ fontSize: '11px', color: actionMessage.type === 'error' ? '#FF4D4D' : '#C5A059', marginTop: '15px' }}>
+              {actionMessage.text}
+            </p>
           )}
-        </div>
+        </aside>
       </div>
     </div>
   );
 }
+
+/* === ELITE SYSTEM STYLES === */
+
+const pageWrapper: React.CSSProperties = { color: "#E0E7E5" };
+const headerRow: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "40px" };
+const titleStyle: React.CSSProperties = { fontFamily: "'Gilda Display', serif", fontSize: "32px", letterSpacing: "2px", margin: 0 };
+const subtitleStyle: React.CSSProperties = { fontSize: "12px", color: "#94A39F", letterSpacing: "1px", marginTop: "5px" };
+
+const backBtn: React.CSSProperties = { 
+  fontSize: "11px", color: "#C5A059", textDecoration: "none", border: "1px solid #C5A059", 
+  padding: "8px 16px", borderRadius: "6px", fontWeight: 700, letterSpacing: "1px" 
+};
+
+const mainGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 340px", gap: "30px" };
+const cardStyle: React.CSSProperties = { backgroundColor: "#141615", padding: "30px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" };
+
+const messageBlock: React.CSSProperties = { marginBottom: "25px" };
+const labelStyle: React.CSSProperties = { display: "block", fontSize: "10px", fontWeight: 700, color: "#94A39F", letterSpacing: "2px", marginBottom: "10px" };
+const bubbleStyle: React.CSSProperties = { backgroundColor: "rgba(255,255,255,0.03)", padding: "15px", borderRadius: "6px", fontSize: "14px", lineHeight: "1.6", border: "1px solid rgba(255,255,255,0.02)" };
+
+const replySection: React.CSSProperties = { borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "25px" };
+const inputStyle: React.CSSProperties = { width: "100%", backgroundColor: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "15px", color: "#fff", fontSize: "14px", outline: "none", marginBottom: "15px" };
+
+const primaryBtn: React.CSSProperties = { backgroundColor: "#C5A059", color: "#0A0C0B", border: "none", padding: "14px 24px", borderRadius: "6px", fontWeight: 700, fontSize: "12px", cursor: "pointer", width: "100%" };
+
+const sidebarTitle: React.CSSProperties = { fontFamily: "'Gilda Display', serif", fontSize: "18px", color: "#C5A059", marginBottom: "25px", letterSpacing: "1px" };
+const intelGroup: React.CSSProperties = { marginBottom: "20px" };
+const fieldInput: React.CSSProperties = { width: "100%", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "10px", color: "#fff", fontSize: "13px" };
+
+const actionStack: React.CSSProperties = { display: "flex", flexDirection: "column", gap: "10px", marginTop: "30px" };
+const saveBtn: React.CSSProperties = { backgroundColor: "rgba(255,255,255,0.05)", color: "#fff", border: "none", padding: "12px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, cursor: "pointer" };
+const goldBtn: React.CSSProperties = { backgroundColor: "transparent", border: "1px solid #C5A059", color: "#C5A059", padding: "12px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, cursor: "pointer" };
+const dangerBtn: React.CSSProperties = { backgroundColor: "transparent", border: "1px solid #FF4D4D", color: "#FF4D4D", padding: "12px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, cursor: "pointer" };

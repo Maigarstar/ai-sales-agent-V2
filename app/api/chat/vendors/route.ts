@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-// FORCE DYNAMIC: Ensures fresh keys are loaded on every request
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type ChatMessage = {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
 };
 
@@ -17,189 +16,127 @@ type LeadMetadata = {
   business_category?: string | null;
   location?: string | null;
   client_budget?: string | null;
-  follow_up_next_step?: string | null;
   name?: string | null;
   email?: string | null;
   phone?: string | null;
-  couple_destination?: string | null;
-  couple_guest_count?: string | null;
   source?: string | null;
   [key: string]: any;
 };
 
-// FIX 1: Use a safe fallback so build doesn't crash
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "dummy-key",
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || "",
 });
 
-// FIX 2: Safe fallbacks for Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key";
-
-function getSupabaseServerClient() {
-  // If in build mode (placeholder), return null
-  if (supabaseUrl === "https://placeholder.supabase.co" || !supabaseServiceKey) {
-    return null;
-  }
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+  { auth: { persistSession: false } }
+);
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const messages: ChatMessage[] = body.messages || [];
+    const { 
+      message, 
+      messages: history = [], 
+      knowledgeContext, 
+      calendarRequested,
+      organisationId = "9ecd45ab-6ed2-46fa-914b-82be313e06e4",
+      agentId = "70660422-489c-4b7d-81ae-b786e43050db"
+    } = body;
 
-    // RUNTIME CHECK: Stop here if the live site still has the dummy key
-    // This gives you a clear error in the browser network tab if keys are wrong
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.includes("sk-dummy")) {
-       console.error("CRITICAL ERROR: OpenAI Key is still the dummy key!");
-       return NextResponse.json(
-        { ok: false, error: "Server Configuration Error: Using Dummy Key" },
-        { status: 500 }
-      );
+    let conversationId = body.conversation_id || null;
+
+    // 1. CALENDAR & KNOWLEDGE INJECTION
+    let calendarContext = "If asked about meetings, inform the user you can check the calendar.";
+    if (calendarRequested) {
+      calendarContext = "Your next available slots for a consultation are Tuesday at 2pm and Wednesday at 10am.";
     }
 
-    const chatType: "vendor" | "couple" =
-      body.chatType === "vendor" || body.mode === "vendor" ? "vendor" : "couple";
+    // 2. CONSTRUCT SYSTEM PROMPT WITH METADATA EXTRACTION
+    const systemPrompt = `
+You are Aura, the bespoke luxury concierge for 5 Star Weddings. 
+Brand Knowledge: ${JSON.stringify(knowledgeContext)}
+Availability: ${calendarContext}
 
-    const organisationId: string =
-      body.organisationId || "9ecd45ab-6ed2-46fa-914b-82be313e06e4";
-    const agentId: string =
-      body.agentId || "70660422-489c-4b7d-81ae-b786e43050db";
+INSTRUCTIONS:
+1. Provide a warm, high-end reply.
+2. After your reply, output metadata in valid JSON inside a <metadata> block.
+3. Metadata should extract Lead info (name, email, intent, score).
 
-    let conversationId: string | null =
-      typeof body.conversation_id === "string" ? body.conversation_id : null;
-
-    if (messages.length === 0) {
-      return NextResponse.json({ ok: false, error: "No messages supplied" }, { status: 400 });
-    }
-
-    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
-    if (!lastUserMessage) {
-      return NextResponse.json({ ok: false, error: "No user message found" }, { status: 400 });
-    }
-
-    // --- SYSTEM PROMPTS ---
-    const systemPrompt = chatType === "vendor"
-      ? `
-You are the AI Vendor Qualification Assistant for 5 Star Weddings.
-First, write a warm, natural reply for the business. Then, output metadata in valid JSON inside a <metadata> block.
 Format:
 [Reply text here]
 <metadata>
-{ "score": 0, "lead_type": "Warm", "business_category": "Venue", "location": "Italy", "name": null, "email": null, "phone": null }
-</metadata>
-`.trim()
-      : `
-You are the AI Wedding Concierge for couples.
-First, write a warm reply. Then, output metadata in valid JSON inside a <metadata> block.
-Format:
-[Reply text here]
-<metadata>
-{ "score": 0, "lead_type": "Warm", "business_category": "Couple", "location": "Italy", "name": null, "email": null, "phone": null }
-</metadata>
-`.trim();
+{ "score": 10, "lead_type": "Hot", "business_category": "Venue", "name": null, "email": null }
+</metadata>`.trim();
 
-    // --- CALL OPENAI ---
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+    // 3. PREPARE MESSAGES FOR OPENAI
+    const apiMessages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      ...history,
+      { role: "user", content: message }
+    ];
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
       temperature: 0.7,
-      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      messages: apiMessages,
     });
 
     const fullContent = completion.choices[0]?.message?.content || "";
 
-    // --- PARSE METADATA ---
-    let replyText = fullContent.trim();
+    // 4. PARSE REPLY VS METADATA
+    let replyText = fullContent;
     let metadata: LeadMetadata = {};
+    const metaStart = fullContent.indexOf("<metadata>");
+    const metaEnd = fullContent.indexOf("</metadata>");
 
-    const lower = fullContent.toLowerCase();
-    const metaStart = lower.indexOf("<metadata>");
-    const metaEnd = lower.indexOf("</metadata>");
-
-    if (metaStart !== -1 && metaEnd !== -1 && metaEnd > metaStart) {
+    if (metaStart !== -1 && metaEnd !== -1) {
       replyText = fullContent.slice(0, metaStart).trim();
-      const jsonBlock = fullContent.slice(metaStart + "<metadata>".length, metaEnd).trim();
+      const jsonBlock = fullContent.slice(metaStart + 10, metaEnd).trim();
       try {
         metadata = JSON.parse(jsonBlock);
-      } catch (err) {
-        console.error("Failed parsing metadata JSON", err);
-      }
+      } catch (e) { console.error("Metadata parse error"); }
     }
-    if (!replyText) replyText = fullContent.trim();
 
-    // --- SUPABASE SAVING ---
-    const supabase = getSupabaseServerClient();
-    let leadId: string | null = null;
-
+    // 5. SUPABASE TRACKING & LEAD SYNC
     if (supabase) {
-      // 1. Handle Conversation
+      // Handle Conversation Tracking
       if (!conversationId) {
         const { data: conv } = await supabase.from("conversations").insert({
-            organisation_id: organisationId,
-            agent_id: agentId,
-            chat_type: chatType,
-            status: "new",
-            channel: "web",
-            last_user_message_at: new Date().toISOString(),
-            user_type: chatType === "vendor" ? "vendor" : "planning",
-            first_message: lastUserMessage.content,
-            last_message: replyText,
-            contact_name: metadata.name ?? null,
-            contact_email: metadata.email ?? null,
-            contact_phone: metadata.phone ?? null,
-          }).select("id").single();
+          organisation_id: organisationId,
+          agent_id: agentId,
+          status: "new",
+          last_message: replyText,
+          contact_name: metadata.name,
+          contact_email: metadata.email
+        }).select("id").single();
         if (conv) conversationId = conv.id;
       } else {
         await supabase.from("conversations").update({
-            last_user_message_at: new Date().toISOString(),
-            last_message: replyText,
-            contact_name: metadata.name ?? null,
-            contact_email: metadata.email ?? null,
-            contact_phone: metadata.phone ?? null,
+          last_message: replyText,
+          contact_name: metadata.name,
+          contact_email: metadata.email
         }).eq("id", conversationId);
       }
 
-      // 2. Save Messages
+      // Save Lead Data
+      const { data: leadData } = await supabase.from("vendor_leads").insert({
+        organisation_id: organisationId,
+        agent_id: agentId,
+        source: metadata.source || "aura_live_chat",
+        score: metadata.score,
+        lead_type: metadata.lead_type,
+        raw_metadata: metadata,
+        name: metadata.name,
+        email: metadata.email
+      }).select("id").single();
+
+      // Log Messages to Transcript
       if (conversationId) {
         await supabase.from("messages").insert([
-          { conversation_id: conversationId, sender_type: "user", content: lastUserMessage.content },
+          { conversation_id: conversationId, sender_type: "user", content: message },
           { conversation_id: conversationId, sender_type: "assistant", content: replyText }
-        ]);
-        // Transcript for live view
-        await supabase.from("conversation_messages").insert([
-           { conversation_id: conversationId, sender_type: chatType === "vendor" ? "vendor" : "couple", message: lastUserMessage.content },
-           { conversation_id: conversationId, sender_type: "assistant", message: replyText }
-        ]);
-      }
-
-      // 3. Create/Update Vendor Lead
-      const { data: leadData } = await supabase.from("vendor_leads").insert({
-          organisation_id: organisationId,
-          agent_id: agentId,
-          chat_type: chatType,
-          source: metadata.source || "web_chat",
-          raw_chat_messages: messages,
-          raw_metadata: metadata,
-          score: metadata.score ?? null,
-          lead_type: metadata.lead_type ?? null,
-          business_category: metadata.business_category ?? null,
-          location: metadata.location ?? null,
-          name: metadata.name ?? null,
-          email: metadata.email ?? null,
-          phone: metadata.phone ?? null,
-      }).select().single();
-
-      if (leadData) {
-        leadId = leadData.id;
-        if (conversationId) await supabase.from("conversations").update({ lead_id: leadId }).eq("id", conversationId);
-        
-        // 4. Vendor Messages Stream
-        await supabase.from("vendor_messages").insert([
-            { lead_id: leadId, role: "user", message: lastUserMessage.content },
-            { lead_id: leadId, role: "assistant", message: replyText }
         ]);
       }
     }
@@ -208,11 +145,11 @@ Format:
       ok: true,
       reply: replyText,
       metadata,
-      lead_id: leadId,
-      conversation_id: conversationId,
+      conversation_id: conversationId
     });
-  } catch (err: any) {
-    console.error("VENDORS-CHAT API ERROR:", err);
-    return NextResponse.json({ ok: false, error: err.message || "Server Error" }, { status: 500 });
+
+  } catch (error: any) {
+    console.error("Aura API Error:", error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }

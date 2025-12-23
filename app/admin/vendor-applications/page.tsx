@@ -1,7 +1,5 @@
-// app/admin/vendor-applications/page.tsx
-
 import Link from "next/link";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type VendorApplication = {
   id: string;
@@ -15,37 +13,19 @@ type VendorApplication = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminVendorApplicationsPage() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("Missing Supabase env vars in admin/vendor-applications");
-    return (
-      <div style={{ padding: 32 }}>
-        <h1>Vendor Applications</h1>
-        <p style={{ color: "red" }}>
-          Supabase configuration is missing in environment variables.
-        </p>
-      </div>
-    );
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createAdminClient();
 
   const { data, error } = await supabase
     .from("vendor_applications")
-    .select("*")
+    .select("id, created_at, name, email, business_name, status")
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("SUPABASE LIST ERROR vendor_applications:", error);
     return (
       <div style={{ padding: 32 }}>
         <h1>Vendor Applications</h1>
         <p style={{ color: "red" }}>Error loading applications.</p>
-        <pre style={{ marginTop: 16, fontSize: 12 }}>
-          {error.message}
-        </pre>
+        <pre style={{ marginTop: 16, fontSize: 12 }}>{error.message}</pre>
       </div>
     );
   }
@@ -53,35 +33,16 @@ export default async function AdminVendorApplicationsPage() {
   const applications = (data || []) as VendorApplication[];
 
   return (
-    <div
-      style={{
-        padding: "32px",
-        maxWidth: "960px",
-        margin: "0 auto",
-        fontFamily:
-          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      }}
-    >
-      <h1 style={{ fontSize: 26, marginBottom: 8 }}>
-        Vendor Applications
-      </h1>
-
+    <div style={{ padding: 32, maxWidth: 960, margin: "0 auto" }}>
+      <h1 style={{ fontSize: 26, marginBottom: 8 }}>Vendor Applications</h1>
       <p style={{ marginBottom: 24, color: "#555", fontSize: 14 }}>
         Total applications: {applications.length}
       </p>
 
-      {applications.length === 0 && (
+      {applications.length === 0 ? (
         <p style={{ color: "#777" }}>No applications yet.</p>
-      )}
-
-      {applications.length > 0 && (
-        <div
-          style={{
-            border: "1px solid #eee",
-            borderRadius: 12,
-            overflow: "hidden",
-          }}
-        >
+      ) : (
+        <div style={{ border: "1px solid #eee", borderRadius: 12, overflow: "hidden" }}>
           <div
             style={{
               display: "grid",
@@ -112,39 +73,25 @@ export default async function AdminVendorApplicationsPage() {
               }}
             >
               <div>
-                <div style={{ fontWeight: 600 }}>
-                  {app.business_name || "Untitled"}
-                </div>
-                <div style={{ color: "#777" }}>
-                  ID: {app.id}
-                </div>
+                <div style={{ fontWeight: 600 }}>{app.business_name || "Untitled"}</div>
+                <div style={{ color: "#777" }}>ID: {app.id}</div>
               </div>
 
               <div>
                 <div>{app.name || "No name"}</div>
-                <div style={{ color: "#777" }}>
-                  {app.email || "No email"}
-                </div>
+                <div style={{ color: "#777" }}>{app.email || "No email"}</div>
               </div>
 
               <div style={{ color: "#555" }}>
-                {app.created_at
-                  ? new Date(app.created_at).toLocaleString("en-GB")
-                  : "Unknown"}
+                {app.created_at ? new Date(app.created_at).toLocaleString("en-GB") : "Unknown"}
               </div>
 
-              <div style={{ textTransform: "capitalize" }}>
-                {app.status || "new"}
-              </div>
+              <div style={{ textTransform: "capitalize" }}>{app.status || "new"}</div>
 
               <div>
                 <Link
                   href={`/admin/vendor-applications/${app.id}`}
-                  style={{
-                    fontSize: 13,
-                    color: "#183F34",
-                    textDecoration: "underline",
-                  }}
+                  style={{ fontSize: 13, color: "#183F34", textDecoration: "underline" }}
                 >
                   Open
                 </Link>

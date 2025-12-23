@@ -4,9 +4,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Vendor Sales Agent | 5 Star Weddings",
+  title: "Your Private Wedding Concierge | 5 Star Weddings",
   description:
-    "Share a little about your brand and let our AI concierge show you how 5 Star Weddings can bring you more high value destination enquiries.",
+    "Connect with our private wedding concierge to explore fit, visibility, and refined connections for couples, venues, and wedding vendors worldwide.",
 };
 
 export default function VendorSalesAgentPage() {
@@ -20,46 +20,55 @@ export default function VendorSalesAgentPage() {
       }}
     >
       <div style={{ maxWidth: 1040, margin: "0 auto" }}>
-        <section style={{ marginBottom: 32, textAlign: "center" }}>
-          <p
-            style={{
-              textTransform: "uppercase",
-              letterSpacing: "0.2em",
-              fontSize: 11,
-              color: "#777",
-              marginBottom: 8,
-            }}
-          >
-            5 Star Weddings
-          </p>
+        {/* Header */}
+        <section
+  style={{
+    marginBottom: 32,
+    textAlign: "center",
+  }}
+>
+  <h1
+    style={{
+      fontFamily: "Gilda Display, serif",
+      fontSize: 44,
+      lineHeight: 1.2,
+      color: "#183F34",
+      marginBottom: 12,
+      fontWeight: 400,
+    }}
+  >
+    5 Star Weddings
+  </h1>
 
-          <h1
-            style={{
-              fontFamily: "Gilda Display, serif",
-              fontSize: 32,
-              color: "#183F34",
-              marginBottom: 10,
-            }}
-          >
-            Vendor Sales Agent
-          </h1>
+  <h3
+    style={{
+      fontFamily: "Gilda Display, serif",
+      fontSize: 30,
+      lineHeight: 1.3,
+      color: "#183F34",
+      marginBottom: 18,
+      fontWeight: 400,
+    }}
+  >
+    Your Private Wedding Concierge
+  </h3>
 
-          <p
-            style={{
-              maxWidth: 640,
-              margin: "0 auto",
-              fontSize: 15,
-              lineHeight: 1.6,
-              color: "#555",
-            }}
-          >
-            Share a little about your brand and I will guide you through whether
-            our collection is the right fit, what kind of visibility we can
-            bring, and how we help venues and vendors attract more international
-            couples.
-          </p>
-        </section>
+  <p
+    style={{
+      maxWidth: 700,
+      margin: "0 auto",
+      fontSize: 16,
+      lineHeight: 1.7,
+      color: "#555",
+    }}
+  >
+    Share a little about your brand or your celebration and I will guide you
+    through whether our collection is the right fit, what kind of visibility we
+    can bring, and how we connect couples and exceptional venues worldwide.
+  </p>
+</section>
 
+        {/* Main Grid */}
         <section
           className="vendorSalesGrid"
           style={{
@@ -68,6 +77,7 @@ export default function VendorSalesAgentPage() {
             gap: 24,
           }}
         >
+          {/* Left Panel */}
           <div
             style={{
               backgroundColor: "#ffffff",
@@ -95,10 +105,10 @@ export default function VendorSalesAgentPage() {
                 marginBottom: 18,
               }}
             >
-              Our AI concierge will ask a few smart questions about your venue
-              or service, typical budgets, locations, and the kind of enquiries
-              you want more of. From there, we can see how you might sit within
-              our curated collection and which plan makes sense.
+              Our concierge asks a few thoughtful questions about your venue or
+              service, typical budgets, locations, and the type of enquiries you
+              want more of. From there, we explore how you may sit within our
+              curated collection and which options make sense.
             </p>
 
             <ul
@@ -111,13 +121,13 @@ export default function VendorSalesAgentPage() {
               }}
             >
               <li style={{ marginBottom: 8 }}>
-                • Discover how many high value couples we reach in your markets
+                • Understand the level of couples we reach in your markets
               </li>
               <li style={{ marginBottom: 8 }}>
-                • Explore options for featured placement and editorial coverage
+                • Explore featured placement and editorial opportunities
               </li>
               <li style={{ marginBottom: 8 }}>
-                • See how Taigenic AI helps qualify enquiries and save you time
+                • See how Taigenic AI helps qualify enquiries and save time
               </li>
             </ul>
 
@@ -166,11 +176,12 @@ export default function VendorSalesAgentPage() {
             </div>
 
             <p style={{ marginTop: 16, fontSize: 12, color: "#777" }}>
-              Prefer to type instead of talk? Use the concierge on the right,
-              then we can follow up personally with a tailored proposal.
+              Prefer to type instead of talk? Use the concierge on the right and
+              we can follow up personally with a tailored proposal.
             </p>
           </div>
 
+          {/* Right Panel */}
           <div
             style={{
               backgroundColor: "#ffffff",
@@ -209,12 +220,12 @@ export default function VendorSalesAgentPage() {
                   margin: 0,
                 }}
               >
-                Vendor Sales Agent
+                Here to help you 24/7
               </p>
             </div>
 
             <iframe
-              title="Vendor Sales Agent"
+              title="Vendor Concierge"
               src="/vendors-chat?embed=1"
               style={{
                 border: "none",
@@ -227,6 +238,59 @@ export default function VendorSalesAgentPage() {
             />
           </div>
         </section>
+
+        {/* Footer Branding */}
+        <footer
+          style={{
+            marginTop: 60,
+            padding: "36px 16px 42px",
+            textAlign: "center",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "Gilda Display, serif",
+              fontSize: 16,
+              color: "#183F34",
+              marginBottom: 6,
+            }}
+          >
+            5 Star Weddings, The Luxury Wedding Collection
+          </p>
+
+          <p
+            style={{
+              fontSize: 13,
+              color: "#666",
+              maxWidth: 520,
+              margin: "0 auto 18px",
+              lineHeight: 1.6,
+            }}
+          >
+            A curated collection of exceptional wedding venues and vendors,
+            supported by refined editorial and intelligent concierge guidance.
+          </p>
+
+          <p style={{ fontSize: 12, color: "#888" }}>
+            Powered by <span style={{ color: "#183F34" }}>Taigenic.ai</span> ·{" "}
+            <a
+              href="#"
+              data-cookie-preferences
+              style={{ color: "#888", textDecoration: "underline" }}
+            >
+              Cookie Preferences
+            </a>{" "}
+            ·{" "}
+            <a
+              href="https://5starweddingdirectory.com/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#888", textDecoration: "underline" }}
+            >
+              Privacy Policy
+            </a>
+          </p>
+        </footer>
 
         <style>{`
           @media (max-width: 840px) {

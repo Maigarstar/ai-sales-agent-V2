@@ -1,69 +1,99 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 
-function normalizeUserType(v: unknown): "vendor" | "couple" {
-  if (v === "vendor") return "vendor";
-  return "couple";
+function mustGetEnv(name: string) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env var: ${name}`);
+  return v;
 }
 
-export async function POST() {
+function clean(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return null;
+  const t = value.trim();
+  return t.length ? t : null;
+}
+
+function supabaseAdmin() {
+  const url = mustGetEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const serviceKey = mustGetEnv("SUPABASE_SERVICE_ROLE_KEY");
+  return createClient(url, serviceKey, { auth: { persistSession: false } });
+}
+
+export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
+    const body = await req.json().catch(() => ({}));
 
-    const { data: auth, error: authError } = await supabase.auth.getUser();
-    if (authError || !auth?.user) {
+    const user_type = clean(body.user_type) || "couple"; // "vendor" or "couple"
+    const contact_name = clean(body.contact_name);
+    const contact_email = clean(body.contact_email);
+    const contact_phone = clean(body.contact_phone);
+
+    const venue_or_location = clean(body.venue_or_location);
+    const website = clean(body.website);
+
+    // wedding_date can arrive as "YYYY-MM-DD"
+    const wedding_date_raw = clean(body.wedding_date);
+    const wedding_date = wedding_date_raw ? wedding_date_raw : null;
+
+    if (!contact_name && !contact_email && !contact_phone) {
       return NextResponse.json(
-        { ok: false, error: "Authentication required to start a chat." },
-        { status: 401 }
-      );
-    }
-
-    const user = auth.user;
-
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("user_type, full_name, phone_number")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError) {
-      return NextResponse.json(
-        { ok: false, error: "Profile not found, please complete onboarding." },
+        { ok: false, error: "Please provide at least one contact detail." },
         { status: 400 }
       );
     }
 
-    const conversationId = crypto.randomUUID();
+    const conversationId = randomUUID();
+    const supabase = supabaseAdmin();
 
-    const insertRow = {
+    // Build insert payload
+    const insertRow: Record<string, any> = {
       id: conversationId,
-      user_id: user.id,
-      user_type: normalizeUserType(profile?.user_type),
+      user_type,
       status: "new",
-      contact_name: profile?.full_name ?? null,
-      contact_phone: profile?.phone_number ?? null,
-      contact_email: user.email ?? null,
+      first_message: null,
+      last_message: null,
+      contact_name,
+      contact_email,
+      contact_phone,
+      venue_or_location,
+      website,
+      wedding_date,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    const { error: insertError } = await supabase
-      .from("conversations")
-      .insert(insertRow);
+    // Insert, if schema has missing columns we retry without them
+    const tryInsert = async (row: Record<string, any>) => {
+      return await supabase.from("conversations").insert(row);
+    };
 
-    if (insertError) {
-      console.error("Supabase Insert Error:", insertError);
-      return NextResponse.json(
-        { ok: false, error: insertError.message },
-        { status: 500 }
-      );
+    let { error } = await tryInsert(insertRow);
+
+    if (error) {
+      const msg = (error.message || "").toLowerCase();
+
+      const retryRow = { ...insertRow };
+
+      if (msg.includes("column") && msg.includes("website")) delete retryRow.website;
+      if (msg.includes("column") && msg.includes("wedding_date")) delete retryRow.wedding_date;
+      if (msg.includes("column") && msg.includes("venue_or_location"))
+        delete retryRow.venue_or_location;
+
+      // retry once
+      const retry = await tryInsert(retryRow);
+      error = retry.error || null;
+    }
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, conversationId }, { status: 200 });
   } catch (e: any) {
-    console.error("Server Error:", e?.message || e);
     return NextResponse.json(
       { ok: false, error: e?.message || "Server error" },
       { status: 500 }

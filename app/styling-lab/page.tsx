@@ -5,6 +5,7 @@ import Link from "next/link";
 import StudioOverlay from "@/components/aura/StudioOverlay";
 import { createBrowserClient } from "@supabase/ssr";
 import { useProfile } from "@/hooks/useProfile";
+import { ensureAnonSession } from "@/lib/supabase/ensureAnonSession";
 
 type StoreItem = {
   id: string;
@@ -14,7 +15,6 @@ type StoreItem = {
 };
 
 export default function StylingLabPage() {
-  // ✅ Initialize Supabase Browser Client
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -24,7 +24,6 @@ export default function StylingLabPage() {
     []
   );
 
-  // ✅ Destructure refreshProfile (Make sure your useProfile hook is updated as well)
   const { profile, refreshProfile } = useProfile();
 
   const [open, setOpen] = useState(false);
@@ -36,13 +35,23 @@ export default function StylingLabPage() {
     window.setTimeout(() => setToast(null), 2200);
   }, []);
 
-  /**
-   * Deducts coins via a Database RPC function. 
-   * This is atomic: it deducts coins and creates a transaction record in one step.
-   */
+  const openStudio = useCallback(async () => {
+    const ensured = await ensureAnonSession(supabase);
+    if (!ensured.ok) {
+      showToast("Please refresh, session could not start.");
+      return;
+    }
+    await refreshProfile();
+    setOpen(true);
+  }, [supabase, refreshProfile, showToast]);
+
   const spendCoins = useCallback(
     async (amount: number, description: string) => {
-      // ✅ Using RPC for atomic coin deduction (Security Best Practice)
+      const ensured = await ensureAnonSession(supabase);
+      if (!ensured.ok) {
+        return { ok: false, error: "Session required." };
+      }
+
       const { error } = await supabase.rpc("deduct_coins", {
         amount_to_deduct: amount,
         spend_description: description,
@@ -58,25 +67,24 @@ export default function StylingLabPage() {
     [supabase, showToast]
   );
 
-  /**
-   * Loads inventory for the studio selector
-   */
   const loadInventory = useCallback(async (): Promise<StoreItem[]> => {
     const { data, error } = await supabase
       .from("store_inventory")
       .select("id, title, image_url, bucket")
-      .eq("status", "approved") // Only show items approved by admin
+      .eq("status", "approved")
       .order("created_at", { ascending: false });
 
     if (error) return [];
     return (data ?? []) as StoreItem[];
   }, [supabase]);
 
-  /**
-   * Sends the user image and selected dress to the AI API
-   */
   const generateVirtualTryOn = useCallback(
     async (args: { userImageFile: File; styleItem: StoreItem }) => {
+      const ensured = await ensureAnonSession(supabase);
+      if (!ensured.ok) {
+        throw new Error("Session required.");
+      }
+
       const form = new FormData();
       form.append("image", args.userImageFile);
       form.append("style_id", args.styleItem.id);
@@ -86,21 +94,25 @@ export default function StylingLabPage() {
         body: form,
       });
 
+      const json = await res.json().catch(() => null);
+
       if (!res.ok) {
-        throw new Error("Generation failed. Please check your connection.");
+        const message =
+          json?.error ||
+          json?.message ||
+          "Generation failed. Please check your connection.";
+        throw new Error(message);
       }
 
-      const json = await res.json();
       if (!json?.result_url) throw new Error("Missing result URL");
-      
+
       showToast("Your look is ready.");
       return json.result_url as string;
     },
-    [showToast]
+    [supabase, showToast]
   );
 
   const coinsLabel = useMemo(() => {
-    // Explicitly fallback to 0 to prevent "undefined coins" text
     const c = (profile as any)?.coins ?? 0;
     return `${c} coins`;
   }, [profile]);
@@ -108,7 +120,6 @@ export default function StylingLabPage() {
   return (
     <div className="min-h-screen bg-white font-sans selection:bg-[#1F4D3E]/10">
       <div className="mx-auto max-w-5xl px-6 py-20 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-        {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="max-w-xl">
             <h1 className="text-5xl font-serif text-[#1F4D3E] tracking-tight">
@@ -128,7 +139,7 @@ export default function StylingLabPage() {
             </div>
 
             <button
-              onClick={() => setOpen(true)}
+              onClick={openStudio}
               className="rounded-2xl bg-[#1F4D3E] px-8 py-4 text-sm font-bold uppercase tracking-[0.15em] text-white shadow-xl shadow-[#1F4D3E]/20 hover:bg-[#163C30] hover:-translate-y-0.5 transition-all active:scale-95"
             >
               Enter Studio
@@ -136,41 +147,42 @@ export default function StylingLabPage() {
           </div>
         </div>
 
-        {/* INFO PANEL */}
         <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-10">
           <div className="rounded-[2.5rem] border border-gray-100 bg-gray-50/50 p-10 space-y-4">
-             <div className="h-10 w-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
-                <span className="text-xs font-bold text-[#1F4D3E]">01</span>
-             </div>
-             <h3 className="font-serif text-xl text-[#1F4D3E]">Digital Token System</h3>
-             <p className="text-sm text-gray-500 leading-relaxed">
-               Each virtual session requires <span className="font-bold text-gray-900">{coinCost} coins</span>. 
-               This covers the specialized GPU compute required for high-fidelity garment synthesis. 
-               Tokens are only deducted when you initiate the final "Apply Style" process.
-             </p>
+            <div className="h-10 w-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
+              <span className="text-xs font-bold text-[#1F4D3E]">01</span>
+            </div>
+            <h3 className="font-serif text-xl text-[#1F4D3E]">Digital Token System</h3>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Each virtual session requires <span className="font-bold text-gray-900">{coinCost} coins</span>.
+              This covers the specialized GPU compute required for high-fidelity garment synthesis.
+              Tokens are only deducted when you initiate the final "Apply Style" process.
+            </p>
           </div>
 
           <div className="rounded-[2.5rem] border border-gray-100 bg-gray-50/50 p-10 space-y-4">
-             <div className="h-10 w-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
-                <span className="text-xs font-bold text-[#1F4D3E]">02</span>
-             </div>
-             <h3 className="font-serif text-xl text-[#1F4D3E]">Studio Best Practices</h3>
-             <p className="text-sm text-gray-500 leading-relaxed">
-               For a seamless fit, use a clear, full-body photo taken from the front. 
-               Ensure the background is relatively simple and the lighting is natural. 
-               Your data remains encrypted and is used exclusively for your private session.
-             </p>
+            <div className="h-10 w-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
+              <span className="text-xs font-bold text-[#1F4D3E]">02</span>
+            </div>
+            <h3 className="font-serif text-xl text-[#1F4D3E]">Studio Best Practices</h3>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              For a seamless fit, use a clear, full-body photo taken from the front.
+              Ensure the background is relatively simple and the lighting is natural.
+              Your data remains encrypted and is used exclusively for your private session.
+            </p>
           </div>
         </div>
 
         <div className="mt-12 text-center">
-          <Link className="text-sm text-gray-400 hover:text-[#1F4D3E] transition-colors flex items-center justify-center gap-2" href="/wedding-concierge">
+          <Link
+            className="text-sm text-gray-400 hover:text-[#1F4D3E] transition-colors flex items-center justify-center gap-2"
+            href="/wedding-concierge"
+          >
             <span>←</span> Back to Wedding Concierge
           </Link>
         </div>
       </div>
 
-      {/* STUDIO OVERLAY */}
       <StudioOverlay
         open={open}
         onClose={() => setOpen(false)}
@@ -181,13 +193,12 @@ export default function StylingLabPage() {
         coinCost={coinCost}
       />
 
-      {/* TOAST NOTIFICATION */}
       {toast && (
         <div className="fixed bottom-10 left-1/2 z-[200] -translate-x-1/2 animate-in slide-in-from-bottom-4 duration-300">
-           <div className="bg-[#1F4D3E] text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10">
-              <div className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-xs font-bold uppercase tracking-widest">{toast}</span>
-           </div>
+          <div className="bg-[#1F4D3E] text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10">
+            <div className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-xs font-bold uppercase tracking-widest">{toast}</span>
+          </div>
         </div>
       )}
     </div>

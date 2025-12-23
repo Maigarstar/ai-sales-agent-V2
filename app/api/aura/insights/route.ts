@@ -6,7 +6,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-export const runtime = "nodejs"; // switch to node for DB write support
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
@@ -22,21 +22,14 @@ export async function POST(req: Request) {
     const prompt = `
 You are Aura, the AI concierge for 5 Star Weddings. Analyze this conversation between a couple and the concierge. 
 Output structured JSON with:
-- tone: emotional temperature (e.g. excited, calm, unsure)
-- intent: couple’s goal or stage in journey
+- tone: emotional temperature
+- intent: couple’s goal
 - summary: 2–3 sentence overview
 - recommendation: next best action
 
-Conversation:
-"""${text}"""
+Conversation: """${text}"""
 
-Respond ONLY in JSON format:
-{
-  "tone": "",
-  "intent": "",
-  "summary": "",
-  "recommendation": ""
-}`;
+Respond ONLY in JSON format.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -61,10 +54,12 @@ Respond ONLY in JSON format:
             recommendation: "Manual review recommended.",
           };
 
-    // ✅ Save to Supabase
-    const supabase = createClient();
+    // ✅ FIXED: Await the creation of the Supabase client
+    const supabase = await createClient(); 
+    
     if (lead_id) {
-      await supabase
+      // Now .from() exists because 'supabase' is the client, not a Promise
+      const { error } = await supabase
         .from("vendor_leads")
         .update({
           ai_tone: parsed.tone,
@@ -73,6 +68,10 @@ Respond ONLY in JSON format:
           ai_recommendation: parsed.recommendation,
         })
         .eq("id", lead_id);
+
+      if (error) {
+        console.error("Database update error:", error);
+      }
     }
 
     return NextResponse.json(parsed);
@@ -83,7 +82,7 @@ Respond ONLY in JSON format:
         tone: "Unavailable",
         intent: "Unavailable",
         summary: "AI could not process this conversation.",
-        recommendation: "Try again later or check logs.",
+        recommendation: "Try again later.",
       },
       { status: 200 }
     );

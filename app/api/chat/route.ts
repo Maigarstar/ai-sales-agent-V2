@@ -1,37 +1,31 @@
-import { NextResponse } from 'next/server'
-import { POST as vendorsPOST } from './vendors/route'
+import { NextResponse } from "next/server";
+import { POST as vendorsPOST } from "./vendors/route";
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
+/**
+ * Health check: 
+ * Allows you to visit /api/chat in the browser to verify the API is alive.
+ */
 export async function GET() {
   return NextResponse.json(
     {
       ok: true,
-      message: 'Use POST with your chat payload, this route forwards to /api/chat/vendors.',
+      message: "Aura Chat Engine is Active. Requests are forwarded to /api/chat/vendors.",
+      timestamp: new Date().toISOString()
     },
-    { status: 200 },
-  )
+    { status: 200 }
+  );
 }
 
-// Forward all /api/chat POST traffic to the vendors handler
+/**
+ * Forwarder:
+ * Automatically takes any POST request sent to /api/chat 
+ * and pipes it into the sophisticated vendor logic you've built.
+ */
 export async function POST(req: Request) {
-  return vendorsPOST(req)
-}
-
-// Inside your POST function, after getting the OpenAI response:
-const auraReply = response.choices[0].message.content;
-
-// SIMPLE INTENT DETECTION
-const bookingKeywords = ["book", "appointment", "schedule", "viewing", "available"];
-const isLead = bookingKeywords.some(keyword => auraReply?.toLowerCase().includes(keyword));
-
-if (isLead) {
-  const { data: { user } } = await supabase.auth.getUser();
-  await supabase.from('leads').insert({
-    user_id: user?.id,
-    intent_summary: `Customer inquired about: ${message}`,
-    status: 'qualified'
-  });
+  // This essentially makes /api/chat an alias for /api/chat/vendors
+  return vendorsPOST(req);
 }

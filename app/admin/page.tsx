@@ -57,7 +57,6 @@ export default function AdminPage() {
 
   return (
     <div style={{ ...pageWrapper, color: palette.text }}>
-      {/* Header */}
       <header style={header}>
         <h1 style={{ ...title, color: palette.text }}>
           Concierge Workspace
@@ -68,7 +67,6 @@ export default function AdminPage() {
         </p>
       </header>
 
-      {/* Action Cards */}
       <div style={cardGrid}>
         <ActionCard
           title="Vendor leads"
@@ -95,7 +93,6 @@ export default function AdminPage() {
         />
       </div>
 
-      {/* Dashboard */}
       <section style={dashboardSection}>
         <h2 style={{ ...dashboardTitle, color: palette.text }}>
           Dashboard
@@ -243,27 +240,27 @@ const darkPalette: Palette = {
 };
 
 /* =====================
-   Styles
+   Styles - Type Casting Added
 ===================== */
 
-const pageWrapper = {
+const pageWrapper: React.CSSProperties = {
   minHeight: "100vh",
   fontFamily: "'Nunito Sans', sans-serif",
   padding: "60px 80px",
 };
 
-const header = { marginBottom: "50px" };
-const title = { fontFamily: "'Gilda Display', serif", fontSize: "34px" };
-const subtitle = { fontSize: "15px", maxWidth: "600px", lineHeight: 1.6 };
+const header: React.CSSProperties = { marginBottom: "50px" };
+const title: React.CSSProperties = { fontFamily: "'Gilda Display', serif", fontSize: "34px" };
+const subtitle: React.CSSProperties = { fontSize: "15px", maxWidth: "600px", lineHeight: 1.6 };
 
-const cardGrid = {
+const cardGrid: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
   gap: "24px",
   marginBottom: "60px",
 };
 
-const card = {
+const card: React.CSSProperties = {
   borderRadius: "16px",
   border: "1px solid",
   padding: "28px",
@@ -274,9 +271,9 @@ const card = {
   height: "100%",
 };
 
-const cardTitle = { fontFamily: "'Gilda Display', serif", fontSize: "18px", marginBottom: "10px" };
-const cardText = { fontSize: "14px", marginBottom: "20px" };
-const cardButton = {
+const cardTitle: React.CSSProperties = { fontFamily: "'Gilda Display', serif", fontSize: "18px", marginBottom: "10px" };
+const cardText: React.CSSProperties = { fontSize: "14px", marginBottom: "20px" };
+const cardButton: React.CSSProperties = {
   border: "none",
   borderRadius: "8px",
   padding: "10px 16px",
@@ -285,10 +282,10 @@ const cardButton = {
   width: "100%",
 };
 
-const dashboardSection = { marginTop: "60px" };
-const dashboardTitle = { fontFamily: "'Gilda Display', serif", fontSize: "26px" };
+const dashboardSection: React.CSSProperties = { marginTop: "60px" };
+const dashboardTitle: React.CSSProperties = { fontFamily: "'Gilda Display', serif", fontSize: "26px" };
 
-const statsGrid = {
+const statsGrid: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
   gap: "20px",
@@ -296,20 +293,20 @@ const statsGrid = {
   marginBottom: "60px",
 };
 
-const statCard = {
+const statCard: React.CSSProperties = {
   borderRadius: "12px",
   border: "1px solid",
   padding: "24px",
   backdropFilter: "blur(10px)",
 };
 
-const statLabel = { fontSize: "14px" };
-const statValue = { fontSize: "28px", fontWeight: 700, marginTop: "4px" };
-const statChange = { fontSize: "13px" };
+const statLabel: React.CSSProperties = { fontSize: "14px" };
+const statValue: React.CSSProperties = { fontSize: "28px", fontWeight: 700, marginTop: "4px" };
+const statChange: React.CSSProperties = { fontSize: "13px" };
 
-const futureTitle = { fontFamily: "'Gilda Display', serif", fontSize: "22px", marginBottom: "20px" };
+const futureTitle: React.CSSProperties = { fontFamily: "'Gilda Display', serif", fontSize: "22px", marginBottom: "20px" };
 
-const futureGrid = {
+const futureGrid: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   gap: "24px",
@@ -317,7 +314,7 @@ const futureGrid = {
   marginBottom: "60px",
 };
 
-const futureCard = {
+const futureCard: React.CSSProperties = {
   borderRadius: "16px",
   border: "1px solid",
   padding: "26px",

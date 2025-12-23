@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Trash2, Filter, CheckCircle2, Loader2 } from "lucide-react";
+import { Trash2, Filter, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 
 export default function VendorLeadsPage() {
   const supabase = createClient();
@@ -11,6 +11,7 @@ export default function VendorLeadsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isDark, setIsDark] = useState(false);
 
   const palette = {
     bg: "transparent",
@@ -24,18 +25,23 @@ export default function VendorLeadsPage() {
     border: "rgba(0,0,0,0.08)",
   };
 
-  const isDark =
-    typeof document !== "undefined" &&
-    document.documentElement.getAttribute("data-theme") === "dark";
+  /**
+   * 1. Hydration-Safe Theme Detection
+   * Prevents mismatch errors between server and client during build.
+   */
+  useEffect(() => {
+    const checkTheme = () => {
+      const theme = document.documentElement.getAttribute("data-theme");
+      setIsDark(theme === "dark");
+    };
+    checkTheme();
+    loadLeads();
+  }, []);
 
   const current = {
     text: isDark ? palette.darkText : palette.text,
     cardBg: isDark ? palette.darkCardBg : palette.cardBg,
   };
-
-  useEffect(() => {
-    loadLeads();
-  }, []);
 
   async function loadLeads() {
     setLoading(true);
@@ -187,7 +193,7 @@ export default function VendorLeadsPage() {
                       fontWeight: 600,
                     }}
                   >
-                    {lead.name || "Unnamed lead"}
+                    {lead.name || lead.client_name || "Unnamed lead"}
                   </Link>
                   <p
                     style={{
@@ -197,11 +203,11 @@ export default function VendorLeadsPage() {
                       maxWidth: "600px",
                     }}
                   >
-                    {lead.summary || "No summary text stored yet."}
+                    {lead.summary || lead.ai_summary || "No summary text stored yet."}
                   </p>
                   <div style={{ fontSize: "13px", color: palette.subtle }}>
-                    {lead.type || "Unknown"} | Score:{" "}
-                    {lead.score ? lead.score + "%" : "Unscored"} |{" "}
+                    {lead.type || "Lead"} | Score:{" "}
+                    {lead.score || lead.match_score ? (lead.score || lead.match_score) + "%" : "Unscored"} |{" "}
                     {lead.budget || "Budget not specified"} |{" "}
                     {new Date(lead.created_at).toLocaleString("en-GB", {
                       day: "2-digit",
@@ -229,7 +235,7 @@ export default function VendorLeadsPage() {
               {/* STATUS */}
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <select
-                  value={lead.status || "new"}
+                  value={lead.status || lead.lead_status || "new"}
                   onChange={(e) => updateLeadStatus(lead.id, e.target.value)}
                   style={{
                     border: `1px solid ${palette.green}`,
@@ -248,12 +254,14 @@ export default function VendorLeadsPage() {
                   <option value="lost">Lost</option>
                 </select>
 
-                <CheckCircle2
-                  size={18}
-                  color={palette.green}
-                  title="Saved"
-                  style={{ opacity: 0.8 }}
-                />
+                {/* THE FIX: Remove 'title' from Icon and wrap in div */}
+                <div title="Neural Sync Secure">
+                  <CheckCircle2
+                    size={18}
+                    color={palette.green}
+                    style={{ opacity: 0.8 }}
+                  />
+                </div>
               </div>
             </div>
           ))}

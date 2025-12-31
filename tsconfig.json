@@ -1,54 +1,59 @@
 {
   "compilerOptions": {
+    /* =========================================================
+       Core Language & Module Settings
+       ========================================================= */
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
     "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "noEmit": true,
     "incremental": true,
 
+    /* =========================================================
+       Type Checking & Strictness
+       ========================================================= */
+    "strict": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+
+    /* =========================================================
+       Path Aliases (SINGLE SOURCE OF TRUTH)
+       ========================================================= */
     "baseUrl": ".",
-
     "paths": {
-      "@/*": ["app/*", "*"],
-
-      "@/ecme/*": ["app/ecme/*"],
-
-      "@/components/*": ["app/ecme/components/*", "app/components/*"],
-      "@/utils/*": ["app/ecme/utils/*", "app/utils/*"],
-      "@/configs/*": ["app/ecme/configs/*", "app/configs/*"],
-      "@/constants/*": ["app/ecme/constants/*", "app/constants/*"],
-
-      "@/@types/*": ["app/ecme/types/*"],
-
-      "@/lib/*": ["lib/*", "app/lib/*"],
-      "@/admin/*": ["app/admin/*"]
+      "@/*": ["src/app/*"],
+      "@/lib/*": ["src/lib/*"],
+      "@/types/*": ["types/*"],
+      "@/admin/*": ["src/app/admin/*"]
     },
 
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+    /* =========================================================
+       Next.js Plugin
+       ========================================================= */
+    "plugins": [{ "name": "next" }]
   },
 
+  /* =========================================================
+     Files & Includes
+     ========================================================= */
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    "**/*.mts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts",
     "tailwind.config.js",
     "next.config.mjs"
-, "middleware.ts-old", "app/admin/dashboard/aura/page.tsx.backup"  ],
+  ],
 
+  /* =========================================================
+     Exclusions
+     ========================================================= */
   "exclude": ["node_modules"]
 }

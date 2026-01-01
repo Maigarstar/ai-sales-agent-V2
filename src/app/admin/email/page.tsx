@@ -3,10 +3,11 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 
-// Load our custom HTML editor (Tiptap wrapper)
-const HtmlEditor = dynamic(() => import("@/src/app/components/EmailEditor/HtmlEditor"), {
-  ssr: false,
-});
+// Load custom HTML editor
+const HtmlEditor = dynamic(
+  () => import("@/app/components/EmailEditor/HtmlEditor"),
+  { ssr: false }
+);
 
 export default function EmailCampaignsPage() {
   const [recipients, setRecipients] = useState("");
@@ -16,7 +17,9 @@ export default function EmailCampaignsPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // ===== AI MODIFICATIONS (Right Panel) ===== //
+  /* =========================
+     AI TEMPLATES
+  ========================= */
   const applyTemplate = (type: string) => {
     if (type === "venues") {
       setMessage(`
@@ -57,7 +60,9 @@ export default function EmailCampaignsPage() {
     }
   };
 
-  // ===== SEND EMAIL ===== //
+  /* =========================
+     SEND EMAIL
+  ========================= */
   const sendEmail = async () => {
     setErrorMsg("");
     setSuccessMsg("");
@@ -71,6 +76,9 @@ export default function EmailCampaignsPage() {
 
     const res = await fetch("/api/admin/send-email", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         recipients,
         subject,
@@ -93,9 +101,9 @@ export default function EmailCampaignsPage() {
     setMessage("");
   };
 
-  // ================================================================= //
-  //                           UI LAYOUT                               //
-  // ================================================================= //
+  /* =========================
+     UI
+  ========================= */
   return (
     <div className="max-w-6xl mx-auto py-10 px-6">
       <h1 className="text-3xl font-semibold mb-2">Email campaigns</h1>
@@ -110,11 +118,8 @@ export default function EmailCampaignsPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        {/* LEFT PANEL: Email Composer */}
+        {/* LEFT */}
         <div className="lg:col-span-2 space-y-6">
-
-          {/* Recipients */}
           <div>
             <label className="font-semibold">Recipients</label>
             <input
@@ -126,7 +131,6 @@ export default function EmailCampaignsPage() {
             />
           </div>
 
-          {/* Subject */}
           <div>
             <label className="font-semibold">Subject</label>
             <input
@@ -138,13 +142,11 @@ export default function EmailCampaignsPage() {
             />
           </div>
 
-          {/* Message Editor */}
           <div>
             <label className="font-semibold">Message</label>
             <HtmlEditor value={message} onChange={setMessage} />
           </div>
 
-          {/* SEND BUTTON */}
           <button
             onClick={sendEmail}
             disabled={loading}
@@ -158,17 +160,17 @@ export default function EmailCampaignsPage() {
           )}
         </div>
 
-        {/* RIGHT PANEL: AI TEMPLATES */}
+        {/* RIGHT */}
         <div className="bg-white border rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">AI message templates</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            AI message templates
+          </h3>
 
           <p className="text-sm text-gray-500 mb-6">
             Choose a preset to instantly populate your email with a polished outreach message.
           </p>
 
           <div className="space-y-4">
-
-            {/* Venues Outreach */}
             <button
               onClick={() => applyTemplate("venues")}
               className="w-full text-left p-3 rounded-md border border-[#C8A165] text-[#183F34]"
@@ -176,7 +178,6 @@ export default function EmailCampaignsPage() {
               Venues Outreach
             </button>
 
-            {/* Vendors Outreach */}
             <button
               onClick={() => applyTemplate("vendors")}
               className="w-full text-left p-3 rounded-md border border-blue-400 text-blue-700"
@@ -184,17 +185,14 @@ export default function EmailCampaignsPage() {
               Vendors Outreach
             </button>
 
-            {/* Couples Outreach */}
             <button
               onClick={() => applyTemplate("couples")}
               className="w-full text-left p-3 rounded-md border border-pink-300 text-pink-600"
             >
               Couples Outreach
             </button>
-
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin"; // fixed path
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,18 +27,16 @@ export async function GET(req: Request) {
 
     const { data, error } = await supabase
       .from("vendor_leads")
-      .select(
-        `
-          id,
-          created_at,
-          score,
-          lead_type,
-          business_category,
-          location,
-          raw_metadata,
-          raw_chat_messages
-        `
-      )
+      .select(`
+        id,
+        created_at,
+        score,
+        lead_type,
+        business_category,
+        location,
+        raw_metadata,
+        raw_chat_messages
+      `)
       .eq("id", leadId)
       .single();
 

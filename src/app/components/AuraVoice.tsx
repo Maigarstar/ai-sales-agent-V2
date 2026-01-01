@@ -24,7 +24,20 @@ export default function AuraVoice({
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const isSupported =
+    typeof window !== "undefined" &&
+    typeof RTCPeerConnection !== "undefined" &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getUserMedia === "function" &&
+    window.isSecureContext === true;
+
   async function start() {
+    if (!isSupported) {
+      setHadError(true);
+      onError?.("Voice requires HTTPS and browser support");
+      return;
+    }
+
     if (busy || active) return;
     setBusy(true);
     setHadError(false);
@@ -42,7 +55,10 @@ export default function AuraVoice({
 
       const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = localStream;
-      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+      localStream.getTracks().forEach((track) => {
+        pc.addTrack(track, localStream);
+      });
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -54,8 +70,8 @@ export default function AuraVoice({
       });
 
       if (!res.ok) {
-        const t = await res.text().catch(() => "Voice start failed");
-        throw new Error(t);
+        const msg = await res.text().catch(() => "Voice connection failed");
+        throw new Error(msg);
       }
 
       const sdpAnswer = await res.text();
@@ -63,10 +79,10 @@ export default function AuraVoice({
 
       setActive(true);
       onStart?.();
-    } catch (e: any) {
-      console.error("AuraVoice start error", e);
+    } catch (err: any) {
+      console.error("AuraVoice error", err);
       setHadError(true);
-      onError?.(e.message || "Voice connection failed");
+      onError?.(err?.message || "Voice failed");
       stop();
     } finally {
       setBusy(false);
@@ -94,9 +110,9 @@ export default function AuraVoice({
       audioRef.current.srcObject = null;
     }
 
+    if (active) onStop?.();
     setActive(false);
     setBusy(false);
-    onStop?.();
   }
 
   function toggle() {
@@ -106,12 +122,12 @@ export default function AuraVoice({
 
   useEffect(() => {
     return () => stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <>
       <audio ref={audioRef} autoPlay className="hidden" />
+
       <button
         type="button"
         onClick={toggle}
@@ -120,7 +136,7 @@ export default function AuraVoice({
         aria-pressed={active}
         title={
           hadError
-            ? "Microphone permission needed"
+            ? "Microphone permission required"
             : active
             ? "Voice active"
             : "Start voice chat"
@@ -130,7 +146,7 @@ export default function AuraVoice({
           active
             ? "bg-[#183F34] text-[#C5A059]"
             : "bg-white text-gray-900 border border-gray-200",
-          hadError ? "border border-red-400" : "",
+          hadError ? "border-red-400" : "",
           busy ? "opacity-60 cursor-not-allowed" : "opacity-100",
           className || "",
         ].join(" ")}
@@ -141,6 +157,7 @@ export default function AuraVoice({
             className="absolute inset-0 rounded-full bg-[#C5A059]/20 animate-ping"
           />
         )}
+
         <AudioLines
           size={18}
           className={active ? "opacity-100" : "opacity-70"}

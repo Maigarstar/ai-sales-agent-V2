@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
   } catch (err: any) {
     console.error("GET /admin/leads/get-vendor error:", err);
     return NextResponse.json(
-      { ok: false, error: err.message || "Unknown error" },
+      { ok: false, error: err?.message || "Unknown error" },
       { status: 500 }
     );
   }

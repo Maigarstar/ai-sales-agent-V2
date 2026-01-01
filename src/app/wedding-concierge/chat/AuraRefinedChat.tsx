@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Send, Mic, Menu, X, Sun, Moon, ShieldCheck, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "src/lib/supabase-browser";
+import { createBrowserSupabase } from "@/lib/supabase/browser";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -22,6 +22,7 @@ const GUEST_MESSAGE_LIMIT = 3;
 
 export default function AuraRefinedChat() {
   const router = useRouter();
+  const supabase = createBrowserSupabase();
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -57,13 +58,18 @@ export default function AuraRefinedChat() {
   }, []);
 
   useEffect(() => {
-    const sb = supabaseBrowser();
-    sb.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    supabase.auth.getSession().then(({ data }) =>
+      setSession(data.session ?? null)
+    );
+
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange((_e, s) => setSession(s ?? null));
+    } = supabase.auth.onAuthStateChange((_e, s) =>
+      setSession(s ?? null)
+    );
+
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -83,6 +89,7 @@ export default function AuraRefinedChat() {
         conversationId,
       }),
     });
+
     const data = await res.json();
     if (!data?.ok) throw new Error();
     if (data.conversationId) setConversationId(data.conversationId);
@@ -97,6 +104,7 @@ export default function AuraRefinedChat() {
         messages: next.map(({ role, content }) => ({ role, content })),
       }),
     });
+
     const data = await res.json();
     if (!data?.ok) throw new Error();
     return String(data.reply ?? "");
@@ -108,7 +116,8 @@ export default function AuraRefinedChat() {
       {
         role: "assistant",
         kind: "auth_gate",
-        content: "Create your free account to continue and save your shortlist.",
+        content:
+          "Create your free account to continue and save your shortlist.",
       },
     ]);
   }
@@ -141,13 +150,18 @@ export default function AuraRefinedChat() {
       } catch {
         reply = await sendViaGenericAPI(next);
       }
-      setMessages((m) => [...m, { role: "assistant", content: reply, kind: "text" }]);
+
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: reply, kind: "text" },
+      ]);
     } catch {
       setMessages((m) => [
         ...m,
         {
           role: "assistant",
-          content: "I could not reach the concierge service. Please try again.",
+          content:
+            "I could not reach the concierge service. Please try again.",
           kind: "text",
         },
       ]);
@@ -193,7 +207,9 @@ export default function AuraRefinedChat() {
       {/* Sidebar */}
       <aside
         className={`fixed left-0 top-0 z-[70] h-full w-[280px] p-6 border-r transition-transform ${
-          isLightMode ? "bg-white border-black/10" : "bg-[#121413] border-white/10"
+          isLightMode
+            ? "bg-white border-black/10"
+            : "bg-[#121413] border-white/10"
         } ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between mb-6">
@@ -221,7 +237,9 @@ export default function AuraRefinedChat() {
       {/* Header */}
       <header
         className={`z-50 flex items-center justify-between border-b px-4 py-3 ${
-          isLightMode ? "bg-white border-black/10" : "bg-[#0E100F] border-white/10"
+          isLightMode
+            ? "bg-white border-black/10"
+            : "bg-[#0E100F] border-white/10"
         }`}
       >
         <button onClick={() => setIsSidebarOpen(true)}>
@@ -280,14 +298,17 @@ export default function AuraRefinedChat() {
 
             const isUser = m.role === "user";
             return (
-              <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+              <div
+                key={i}
+                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+              >
                 <div
                   className={`rounded-2xl px-5 py-4 ${
                     isUser
                       ? "bg-[#183F34] text-white"
                       : isLightMode
-                        ? "bg-[#F2F4F3] text-[#112620]"
-                        : "bg-white/10 text-white"
+                      ? "bg-[#F2F4F3] text-[#112620]"
+                      : "bg-white/10 text-white"
                   }`}
                 >
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -305,7 +326,9 @@ export default function AuraRefinedChat() {
       {/* Input */}
       <footer
         className={`px-4 py-6 border-t ${
-          isLightMode ? "bg-white border-black/10" : "bg-[#0E100F] border-white/10"
+          isLightMode
+            ? "bg-white border-black/10"
+            : "bg-[#0E100F] border-white/10"
         }`}
       >
         <div className="mx-auto max-w-3xl">

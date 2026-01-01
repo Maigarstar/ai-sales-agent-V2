@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { createServerSupabase } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -8,7 +8,7 @@ const resend = new Resend(process.env.RESEND_API_KEY!);
 
 export async function POST(req: Request) {
   try {
-    // ✅ Correct server-side Supabase client
+    // ✅ AWAIT the Supabase client
     const supabase = await createServerSupabase();
 
     const body = await req.json();
@@ -30,19 +30,21 @@ export async function POST(req: Request) {
     });
 
     // Log email to Supabase
-    await supabase.from("lead_emails").insert({
-      lead_id,
-      to_email,
-      subject,
-      html_body,
-      created_at: new Date().toISOString(),
-    });
+    await supabase
+      .from("lead_emails")
+      .insert({
+        lead_id,
+        to_email,
+        subject,
+        html_body,
+        created_at: new Date().toISOString(),
+      });
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
-    console.error("Email send failed:", error);
+    console.error("EMAIL SEND ERROR:", error);
     return NextResponse.json(
-      { ok: false, error: error.message || "Email send failed" },
+      { ok: false, error: error?.message ?? "Email send failed" },
       { status: 500 }
     );
   }

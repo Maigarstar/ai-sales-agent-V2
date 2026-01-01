@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -9,7 +10,6 @@ import {
   Mail,
   Phone,
   User,
-  CheckCircle2,
   MessageSquare,
   ClipboardList,
   ShieldCheck,
@@ -18,13 +18,13 @@ import {
 type Tab = "overview" | "notes" | "audit" | "conversations";
 
 export default function AdminUserDetailPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const supabase = createClient();
 
   /* ================= DEMO BUSINESS ================= */
 
-  const [user, setUser] = useState({
+  const [user] = useState({
     id,
     business_name: "The Ritz London",
     contact_name: "Events Director",
@@ -45,7 +45,7 @@ export default function AdminUserDetailPage() {
   const [audit, setAudit] = useState<any[]>([]);
   const [noteInput, setNoteInput] = useState("");
 
-  /* ================= LOAD NOTES ================= */
+  /* ================= LOAD DATA ================= */
 
   useEffect(() => {
     if (activeTab === "notes") loadNotes();
@@ -88,13 +88,11 @@ export default function AdminUserDetailPage() {
 
   return (
     <div style={page}>
-      {/* BACK */}
       <button onClick={() => router.push("/admin/business")} style={backBtn}>
         <ArrowLeft size={14} /> Back to business users
       </button>
 
       <div style={card}>
-        {/* HEADER */}
         <div style={headerRow}>
           <div style={iconWrap}>
             <Building2 />
@@ -107,7 +105,6 @@ export default function AdminUserDetailPage() {
           </div>
         </div>
 
-        {/* STATUS ROW */}
         <div style={metaRow}>
           <Meta label="Tier" value={user.luxury_tier} style={tierPlatinum} />
           <Meta label="Status" value={user.status} style={statusActive} />
@@ -118,19 +115,16 @@ export default function AdminUserDetailPage() {
           />
         </div>
 
-        {/* TABS */}
         <div style={tabs}>
-          <Tab label="Overview" icon={<User size={14} />} active={activeTab === "overview"} onClick={() => setActiveTab("overview")} />
-          <Tab label="Notes" icon={<ClipboardList size={14} />} active={activeTab === "notes"} onClick={() => setActiveTab("notes")} />
-          <Tab label="Audit" icon={<ShieldCheck size={14} />} active={activeTab === "audit"} onClick={() => setActiveTab("audit")} />
-          <Tab label="Conversations" icon={<MessageSquare size={14} />} active={activeTab === "conversations"} onClick={() => setActiveTab("conversations")} />
+          <TabItem label="Overview" icon={<User size={14} />} active={activeTab === "overview"} onClick={() => setActiveTab("overview")} />
+          <TabItem label="Notes" icon={<ClipboardList size={14} />} active={activeTab === "notes"} onClick={() => setActiveTab("notes")} />
+          <TabItem label="Audit" icon={<ShieldCheck size={14} />} active={activeTab === "audit"} onClick={() => setActiveTab("audit")} />
+          <TabItem label="Conversations" icon={<MessageSquare size={14} />} active={activeTab === "conversations"} onClick={() => setActiveTab("conversations")} />
         </div>
 
-        {/* TAB CONTENT */}
         <div style={tabContent}>
           {activeTab === "overview" && (
             <>
-              <h3 style={sectionTitle}>Primary Contact</h3>
               <Row icon={<User size={14} />} text={user.contact_name} />
               <Row icon={<Mail size={14} />} text={user.email} />
               <Row icon={<Phone size={14} />} text={user.phone} />
@@ -140,20 +134,15 @@ export default function AdminUserDetailPage() {
           {activeTab === "notes" && (
             <>
               <textarea
-                placeholder="Add internal admin note"
                 value={noteInput}
                 onChange={(e) => setNoteInput(e.target.value)}
                 style={noteTextarea}
               />
               <button onClick={addNote} style={primaryBtn}>Add note</button>
-
-              {notes.length === 0 && <p style={emptyText}>No notes yet.</p>}
               {notes.map((n) => (
                 <div key={n.id} style={noteItem}>
                   <p>{n.note}</p>
-                  <div style={noteMeta}>
-                    {n.admin_email} • {new Date(n.created_at).toLocaleString("en-GB")}
-                  </div>
+                  <div style={noteMeta}>{n.admin_email}</div>
                 </div>
               ))}
             </>
@@ -161,20 +150,13 @@ export default function AdminUserDetailPage() {
 
           {activeTab === "audit" && (
             <>
-              {audit.length === 0 && <p style={emptyText}>No audit events yet.</p>}
               {audit.map((a) => (
                 <div key={a.id} style={noteItem}>
                   <strong>{a.action}</strong>
-                  <div style={noteMeta}>
-                    {a.admin_email} • {new Date(a.created_at).toLocaleString("en-GB")}
-                  </div>
+                  <div style={noteMeta}>{a.admin_email}</div>
                 </div>
               ))}
             </>
-          )}
-
-          {activeTab === "conversations" && (
-            <p style={emptyText}>AI conversations will appear here.</p>
           )}
         </div>
 
@@ -186,9 +168,9 @@ export default function AdminUserDetailPage() {
   );
 }
 
-/* ================= HELPERS ================= */
+/* ================= COMPONENTS ================= */
 
-function Tab({ label, icon, active, onClick }: any) {
+function TabItem({ label, icon, active, onClick }: any) {
   return (
     <button onClick={onClick} style={{ ...tabBtn, ...(active ? tabActive : {}) }}>
       {icon} {label}
@@ -211,35 +193,33 @@ function Row({ icon, text }: any) {
 
 /* ================= STYLES ================= */
 
-const page = { padding: "70px 100px", fontFamily: "'Nunito Sans', sans-serif" };
-const backBtn = { display: "flex", gap: 8, marginBottom: 30, background: "none", border: "none", cursor: "pointer", color: "#666" };
-const card = { background: "#fff", border: "1px solid #E5E7EB", borderRadius: 20, padding: 44, maxWidth: 960 };
-const headerRow = { display: "flex", gap: 20, marginBottom: 30 };
-const iconWrap = { width: 56, height: 56, borderRadius: 14, background: "#F4F4F4", display: "flex", alignItems: "center", justifyContent: "center" };
-const title = { fontFamily: "'Gilda Display', serif", fontSize: 32 };
-const subtitle = { fontSize: 14, color: "#777" };
+const page: React.CSSProperties = { padding: "70px 100px" };
+const backBtn: React.CSSProperties = { display: "flex", gap: 8, marginBottom: 30, background: "none", border: "none", cursor: "pointer" };
+const card: React.CSSProperties = { background: "#fff", border: "1px solid #E5E7EB", borderRadius: 20, padding: 44, maxWidth: 960 };
+const headerRow: React.CSSProperties = { display: "flex", gap: 20, marginBottom: 30 };
+const iconWrap: React.CSSProperties = { width: 56, height: 56, borderRadius: 14, background: "#F4F4F4", display: "flex", alignItems: "center", justifyContent: "center" };
+const title: React.CSSProperties = { fontSize: 32 };
+const subtitle: React.CSSProperties = { fontSize: 14, color: "#777" };
 
-const metaRow = { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20, marginBottom: 40 };
-const metaBox = { border: "1px solid #EEE", borderRadius: 14, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 6 };
-const metaLabel = { fontSize: 12, color: "#777", fontWeight: 600 };
+const metaRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20, marginBottom: 40 };
+const metaBox: React.CSSProperties = { border: "1px solid #EEE", borderRadius: 14, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 6 };
+const metaLabel: React.CSSProperties = { fontSize: 12, color: "#777", fontWeight: 600 };
 
-const badgeBase = { padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, width: "fit-content" };
-const statusActive = { ...badgeBase, background: "rgba(24,63,52,0.12)", color: "#183F34" };
-const statusPending = { ...badgeBase, background: "rgba(0,0,0,0.06)", color: "#666" };
-const tierPlatinum = { ...badgeBase, background: "linear-gradient(135deg,#E6C87A,#C8A44B)", color: "#1A1A1A" };
+const badgeBase: React.CSSProperties = { padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700 };
+const statusActive: React.CSSProperties = { ...badgeBase, background: "rgba(24,63,52,0.12)", color: "#183F34" };
+const statusPending: React.CSSProperties = { ...badgeBase, background: "rgba(0,0,0,0.06)", color: "#666" };
+const tierPlatinum: React.CSSProperties = { ...badgeBase, background: "#E6C87A", color: "#1A1A1A" };
 
-const tabs = { display: "flex", gap: 12, borderBottom: "1px solid #EEE", marginBottom: 30 };
-const tabBtn = { display: "flex", gap: 8, padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#777" };
-const tabActive = { borderBottom: "2px solid #183F34", color: "#183F34", fontWeight: 700 };
+const tabs: React.CSSProperties = { display: "flex", gap: 12, borderBottom: "1px solid #EEE", marginBottom: 30 };
+const tabBtn: React.CSSProperties = { display: "flex", gap: 8, padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 13 };
+const tabActive: React.CSSProperties = { borderBottom: "2px solid #183F34", fontWeight: 700 };
 
-const tabContent = { paddingTop: 10 };
-const sectionTitle = { fontSize: 14, fontWeight: 700, marginBottom: 16 };
-const contactRow = { display: "flex", gap: 10, marginBottom: 10 };
+const tabContent: React.CSSProperties = { paddingTop: 10 };
+const contactRow: React.CSSProperties = { display: "flex", gap: 10, marginBottom: 10 };
 
-const noteTextarea = { width: "100%", minHeight: 90, borderRadius: 12, border: "1px solid #DDD", padding: 14 };
-const noteItem = { borderBottom: "1px solid #EEE", padding: "14px 0", fontSize: 13 };
-const noteMeta = { fontSize: 11, color: "#999" };
-const emptyText = { fontSize: 13, color: "#999" };
+const noteTextarea: React.CSSProperties = { width: "100%", minHeight: 90, borderRadius: 12, border: "1px solid #DDD", padding: 14 };
+const noteItem: React.CSSProperties = { borderBottom: "1px solid #EEE", padding: "14px 0", fontSize: 13 };
+const noteMeta: React.CSSProperties = { fontSize: 11, color: "#999" };
 
-const primaryBtn = { marginTop: 10, padding: "10px 16px", borderRadius: 12, border: "none", background: "#183F34", color: "#fff", cursor: "pointer" };
-const footer = { marginTop: 30, paddingTop: 20, borderTop: "1px solid #EEE", fontSize: 12, color: "#999" };
+const primaryBtn: React.CSSProperties = { marginTop: 10, padding: "10px 16px", borderRadius: 12, border: "none", background: "#183F34", color: "#fff", cursor: "pointer" };
+const footer: React.CSSProperties = { marginTop: 30, paddingTop: 20, borderTop: "1px solid #EEE", fontSize: 12, color: "#999" };

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { searchDirectory } from "src/lib/edirectory";
+import { searchDirectory } from "@/lib/edirectory";
 
 // GET for browser testing
 export async function GET() {
@@ -9,7 +9,7 @@ export async function GET() {
   });
 }
 
-// POST for Aura
+// POST for Aura Concierge
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -24,16 +24,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const listings = await searchDirectory(searchQuery, limit);
+    const result = await searchDirectory({
+      q: searchQuery,
+      pageSize: limit,
+    });
 
     return NextResponse.json({
       success: true,
-      count: listings.length,
-      listings,
+      count: result.items.length,
+      listings: result.items,
     });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error?.message || "Server error" },
       { status: 500 }
     );
   }

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { createServerSupabase } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
+
+export const runtime = "nodejs";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
-
-export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
@@ -20,7 +20,8 @@ export async function POST(req: Request) {
     }
 
     const prompt = `
-You are Aura, the AI concierge for 5 Star Weddings. Analyze this conversation between a couple and the concierge. 
+You are Aura, the AI concierge for 5 Star Weddings. Analyze this conversation between a couple and the concierge.
+
 Output structured JSON with:
 - tone: emotional temperature
 - intent: couple’s goal
@@ -29,7 +30,8 @@ Output structured JSON with:
 
 Conversation: """${text}"""
 
-Respond ONLY in JSON format.`;
+Respond ONLY in JSON format.
+`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -39,11 +41,14 @@ Respond ONLY in JSON format.`;
           role: "system",
           content: "You are Aura, a luxury wedding AI assistant.",
         },
-        { role: "user", content: prompt },
+        {
+          role: "user",
+          content: prompt,
+        },
       ],
     });
 
-    const reply = completion.choices[0].message?.content || "";
+    const reply = completion.choices[0].message?.content ?? "";
 
     const jsonStart = reply.indexOf("{");
     const jsonEnd = reply.lastIndexOf("}") + 1;
@@ -58,7 +63,7 @@ Respond ONLY in JSON format.`;
             recommendation: "Manual review recommended.",
           };
 
-    // ✅ SERVER-SAFE SUPABASE CLIENT
+    // ✅ IMPORTANT: await the Supabase client
     const supabase = await createServerSupabase();
 
     if (lead_id) {

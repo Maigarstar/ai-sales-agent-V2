@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { calculateDealProbability } from "src/lib/atlas/calculateDealProbability";
+import { calculateDealProbability } from "@/lib/atlas/calculateDealProbability";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,7 +20,7 @@ const STAGES = [
   "intent",
   "handoff",
   "closed",
-];
+] as const;
 
 export default function AtlasInlineStageSelect({
   leadId,
@@ -35,16 +35,13 @@ export default function AtlasInlineStageSelect({
     setSaving(true);
 
     try {
-      // 1. Authenticated user
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      // 2. Fetch current lead snapshot
       const { data: lead } = await supabase
         .from("vendor_leads")
-        .select(
-          `
+        .select(`
           score,
           priority,
           priority_overridden,
@@ -53,14 +50,16 @@ export default function AtlasInlineStageSelect({
           assigned_to,
           invited_at,
           updated_at
-        `
-        )
+        `)
         .eq("id", leadId)
         .single();
 
-      const previousStage = lead?.stage ?? null;
+      if (!lead) {
+        throw new Error("Lead not found");
+      }
 
-      // 3. Update stage + SLA timestamp
+      const previousStage = lead.stage ?? null;
+
       await supabase
         .from("vendor_leads")
         .update({
@@ -69,11 +68,14 @@ export default function AtlasInlineStageSelect({
         })
         .eq("id", leadId);
 
-      // 4. Recalculate probability
-      const probability = calculateDealProbability({
+      // 🔒 GUARANTEE REQUIRED FIELDS
+      const safeLead = {
         ...lead,
+        score: lead.score ?? 0,
         stage: newStage,
-      });
+      };
+
+      const probability = calculateDealProbability(safeLead);
 
       await supabase
         .from("vendor_leads")
@@ -82,7 +84,6 @@ export default function AtlasInlineStageSelect({
         })
         .eq("id", leadId);
 
-      // 5. Audit trail
       await supabase.from("lead_audit_logs").insert({
         lead_id: leadId,
         changed_by: user?.id ?? null,

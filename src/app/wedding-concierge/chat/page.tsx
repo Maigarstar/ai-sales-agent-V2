@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabaseBrowser } from "src/lib/supabase-browser";
+import { createBrowserSupabase } from "@/lib/supabase/browser";
 import ConciergeLoginGate from "../components/ConciergeLoginGate";
 import AuraRefinedChat from "./AuraRefinedChat";
-
-type Prefill = {
-  name?: string;
-  email?: string;
-};
 
 const DISABLE_ONBOARDING =
   process.env.NEXT_PUBLIC_DISABLE_ONBOARDING === "true" ||
@@ -17,19 +12,18 @@ const DISABLE_ONBOARDING =
 export default function WeddingConciergeChatPage() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
-  const [prefill, setPrefill] = useState<Prefill | null>(null);
 
   useEffect(() => {
-    // DEV MODE, skip auth and onboarding entirely
+    // DEV MODE: skip auth and onboarding
     if (DISABLE_ONBOARDING) {
       setSession({ user: { id: "dev-user" } });
       setLoading(false);
       return;
     }
 
-    const sb = supabaseBrowser();
+    const supabase = createBrowserSupabase();
 
-    sb.auth
+    supabase.auth
       .getSession()
       .then(({ data }) => {
         setSession(data.session ?? null);
@@ -48,16 +42,11 @@ export default function WeddingConciergeChatPage() {
     );
   }
 
-  // Production only onboarding and auth gate
+  // Production auth gate
   if (!session && !DISABLE_ONBOARDING) {
-    return (
-      <ConciergeLoginGate
-        onAuthed={(s) => setSession(s)}
-        onPrefill={(p) => setPrefill(p)}
-      />
-    );
+    return <ConciergeLoginGate onAuthed={(s) => setSession(s)} />;
   }
 
   // Live concierge experience
-  return <AuraRefinedChat prefill={prefill ?? undefined} />;
+  return <AuraRefinedChat />;
 }

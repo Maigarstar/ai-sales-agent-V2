@@ -5,7 +5,12 @@ import { X } from "lucide-react";
 import { useCookies } from "./CookieContext";
 
 export default function CookieModal() {
-  const { open, accept, reject } = useCookies();
+  const {
+    open,
+    acceptAnalytics,
+    rejectAnalytics,
+  } = useCookies();
+
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -21,12 +26,12 @@ export default function CookieModal() {
   }
 
   function acceptAll() {
-    accept();
+    acceptAnalytics();
     close();
   }
 
   function rejectNonEssential() {
-    reject();
+    rejectAnalytics();
     close();
   }
 
@@ -61,7 +66,11 @@ export default function CookieModal() {
           </div>
         </div>
 
-        <button onClick={close} style={closeBtn} aria-label="Close cookie banner">
+        <button
+          onClick={close}
+          style={closeBtn}
+          aria-label="Close cookie banner"
+        >
           <X size={16} />
         </button>
       </div>
@@ -69,7 +78,7 @@ export default function CookieModal() {
   );
 }
 
-/* ===== STYLES (UNCHANGED, LUXURY, RESPONSIVE) ===== */
+/* ===== STYLES ===== */
 
 const overlay = {
   position: "fixed" as const,

@@ -2,10 +2,11 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import StudioOverlay from "@/src/app/components/aura/StudioOverlay";
-import { createBrowserClient } from "@supabase/ssr";
-import { useProfile } from "@/src/app/hooks/useProfile";
-import { ensureAnonSession } from "@/src/app/_lib/supabase/ensureAnonSession";
+
+import StudioOverlay from "@/app/components/aura/StudioOverlay";
+import { createBrowserSupabase } from "@/lib/supabase/browser";
+import { useProfile } from "@/hooks/useProfile";
+import { ensureAnonSession } from "@/lib/supabase/ensureAnonSession";
 
 type StoreItem = {
   id: string;
@@ -15,19 +16,13 @@ type StoreItem = {
 };
 
 export default function StylingLabPage() {
-  const supabase = useMemo(
-    () =>
-      createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      ),
-    []
-  );
+  const supabase = useMemo(() => createBrowserSupabase(), []);
 
   const { profile, refreshProfile } = useProfile();
 
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
   const coinCost = 25;
 
   const showToast = useCallback((msg: string) => {
@@ -41,6 +36,7 @@ export default function StylingLabPage() {
       showToast("Please refresh, session could not start.");
       return;
     }
+
     await refreshProfile();
     setOpen(true);
   }, [supabase, refreshProfile, showToast]);
@@ -58,7 +54,10 @@ export default function StylingLabPage() {
       });
 
       if (error) {
-        return { ok: false, error: "Insufficient coins or transaction failed." };
+        return {
+          ok: false,
+          error: "Insufficient coins or transaction failed.",
+        };
       }
 
       showToast("Session started, coins deducted.");
@@ -104,7 +103,9 @@ export default function StylingLabPage() {
         throw new Error(message);
       }
 
-      if (!json?.result_url) throw new Error("Missing result URL");
+      if (!json?.result_url) {
+        throw new Error("Missing result URL");
+      }
 
       showToast("Your look is ready.");
       return json.result_url as string;
@@ -126,7 +127,7 @@ export default function StylingLabPage() {
               Aura Styling Lab
             </h1>
             <p className="mt-4 text-lg text-gray-500 leading-relaxed font-light">
-              Enter our private digital atelier. Experience high-fidelity virtual couture fittings, powered by Aura AI.
+              Enter our private digital atelier. Experience high fidelity virtual couture fittings, powered by Aura AI.
             </p>
           </div>
 
@@ -135,7 +136,9 @@ export default function StylingLabPage() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">
                 Aura Wallet
               </p>
-              <span className="text-xl font-serif text-[#1F4D3E]">{coinsLabel}</span>
+              <span className="text-xl font-serif text-[#1F4D3E]">
+                {coinsLabel}
+              </span>
             </div>
 
             <button
@@ -144,32 +147,6 @@ export default function StylingLabPage() {
             >
               Enter Studio
             </button>
-          </div>
-        </div>
-
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-10">
-          <div className="rounded-[2.5rem] border border-gray-100 bg-gray-50/50 p-10 space-y-4">
-            <div className="h-10 w-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
-              <span className="text-xs font-bold text-[#1F4D3E]">01</span>
-            </div>
-            <h3 className="font-serif text-xl text-[#1F4D3E]">Digital Token System</h3>
-            <p className="text-sm text-gray-500 leading-relaxed">
-              Each virtual session requires <span className="font-bold text-gray-900">{coinCost} coins</span>.
-              This covers the specialized GPU compute required for high-fidelity garment synthesis.
-              Tokens are only deducted when you initiate the final "Apply Style" process.
-            </p>
-          </div>
-
-          <div className="rounded-[2.5rem] border border-gray-100 bg-gray-50/50 p-10 space-y-4">
-            <div className="h-10 w-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
-              <span className="text-xs font-bold text-[#1F4D3E]">02</span>
-            </div>
-            <h3 className="font-serif text-xl text-[#1F4D3E]">Studio Best Practices</h3>
-            <p className="text-sm text-gray-500 leading-relaxed">
-              For a seamless fit, use a clear, full-body photo taken from the front.
-              Ensure the background is relatively simple and the lighting is natural.
-              Your data remains encrypted and is used exclusively for your private session.
-            </p>
           </div>
         </div>
 
@@ -197,7 +174,9 @@ export default function StylingLabPage() {
         <div className="fixed bottom-10 left-1/2 z-[200] -translate-x-1/2 animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-[#1F4D3E] text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10">
             <div className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-widest">{toast}</span>
+            <span className="text-xs font-bold uppercase tracking-widest">
+              {toast}
+            </span>
           </div>
         </div>
       )}

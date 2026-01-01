@@ -1,23 +1,50 @@
-import { NextResponse } from "next/server";
-import type { DirectoryItem } from "@/types/directory";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/* ---------------------------------
+   LOCAL TYPE
+---------------------------------- */
+type DirectoryItem = {
+  id: string | null;
+  title: string;
+  description: string;
+  url: string | null;
+  images: string[];
+  category: string | null;
+  location: string | null;
+  price_from: number | null;
+  rating: number | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+};
 
 const API_BASE = process.env.DIRECTORY_API_BASE || "";
 const API_KEY = process.env.DIRECTORY_API_KEY || "";
 const AUTH_SCHEME = process.env.DIRECTORY_AUTH_SCHEME || "Bearer";
 
+/* ---------------------------------
+   GET DIRECTORY VENDOR (NEXT 15 SAFE)
+---------------------------------- */
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+): Promise<Response> {
+  const { id } = await context.params;
 
   if (!API_BASE || !API_KEY) {
     return NextResponse.json(
       { ok: false, error: "Missing DIRECTORY_API_BASE or DIRECTORY_API_KEY" },
       { status: 500 }
+    );
+  }
+
+  if (!id) {
+    return NextResponse.json(
+      { ok: false, error: "Missing vendor id" },
+      { status: 400 }
     );
   }
 
@@ -28,6 +55,7 @@ export async function GET(
     );
 
     const headers: Record<string, string> = { Accept: "application/json" };
+
     if (AUTH_SCHEME.toLowerCase().startsWith("api")) {
       headers["X-API-KEY"] = API_KEY;
     } else {
@@ -43,6 +71,7 @@ export async function GET(
     if (!res.ok) {
       const text = await res.text();
       console.error("[directory vendor] Upstream error:", res.status, text);
+
       return NextResponse.json(
         { ok: false, error: `Upstream error ${res.status}` },
         { status: 502 }
@@ -59,10 +88,9 @@ export async function GET(
         json.friendly_url && API_BASE
           ? new URL(json.friendly_url, API_BASE).toString()
           : null,
-      images:
-        json.images?.length
-          ? json.images
-          : [json.image_url, json.cover_image, json.thumbnail].filter(Boolean),
+      images: Array.isArray(json.images) && json.images.length
+        ? json.images
+        : [json.image_url, json.cover_image, json.thumbnail].filter(Boolean),
       category:
         json.category ||
         json.categories?.[0]?.title ||
@@ -82,6 +110,7 @@ export async function GET(
     return NextResponse.json({ ok: true, listing });
   } catch (err: any) {
     console.error("[directory vendor] Fatal error:", err);
+
     return NextResponse.json(
       { ok: false, error: err?.message || "Unexpected server error" },
       { status: 500 }

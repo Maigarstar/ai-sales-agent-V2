@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Send, Trash2, X, Sparkles } from "lucide-react";
-import AuraVoice from "@/src/app/components/AuraVoice";
-import VoiceToTextButton from "@/src/app/components/VoiceToTextButton";
+import AuraVoice from "@/app/components/AuraVoice";
+import VoiceToTextButton from "@/app/components/VoiceToTextButton";
 
 /* =========================================================
    CONSTANTS & CONFIG

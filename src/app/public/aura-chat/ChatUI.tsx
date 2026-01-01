@@ -14,8 +14,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import AuraVoice from "@/src/app/components/AuraVoice";
-import VoiceToTextButton from "@/src/app/components/VoiceToTextButton";
+import AuraVoice from "@/app/components/AuraVoice";
+import VoiceToTextButton from "@/app/components/VoiceToTextButton";
+
 
 /* =========================================================
    Storage keys

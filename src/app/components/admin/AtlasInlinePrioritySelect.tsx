@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { calculateDealProbability } from "src/lib/atlas/calculateDealProbability";
+import { calculateDealProbability } from "@/lib/atlas/calculateDealProbability";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const PRIORITIES = ["HOT", "WARM", "COLD"];
+const PRIORITIES = ["HOT", "WARM", "COLD"] as const;
 
 type Props = {
   leadId: string;
@@ -29,12 +29,10 @@ export default function AtlasInlinePrioritySelect({
     setSaving(true);
 
     try {
-      // 1. Authenticated user
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      // 2. Fetch current lead inputs for audit + probability
       const { data: lead } = await supabase
         .from("vendor_leads")
         .select(`
@@ -50,9 +48,20 @@ export default function AtlasInlinePrioritySelect({
         .eq("id", leadId)
         .single();
 
-      const previousPriority = lead?.priority ?? null;
+      if (!lead) {
+        throw new Error("Lead not found");
+      }
 
-      // 3. Update priority
+      // 🔒 GUARANTEE required fields
+      const safeLead = {
+        ...lead,
+        score: lead.score ?? 0,
+        priority: newPriority,
+        priority_overridden: true,
+      };
+
+      const previousPriority = lead.priority ?? null;
+
       await supabase
         .from("vendor_leads")
         .update({
@@ -63,12 +72,7 @@ export default function AtlasInlinePrioritySelect({
         })
         .eq("id", leadId);
 
-      // 4. Recalculate probability
-      const probability = calculateDealProbability({
-        ...lead,
-        priority: newPriority,
-        priority_overridden: true,
-      });
+      const probability = calculateDealProbability(safeLead);
 
       await supabase
         .from("vendor_leads")
@@ -77,7 +81,6 @@ export default function AtlasInlinePrioritySelect({
         })
         .eq("id", leadId);
 
-      // 5. Audit trail
       await supabase.from("lead_audit_logs").insert({
         lead_id: leadId,
         changed_by: user?.id ?? null,
@@ -87,7 +90,6 @@ export default function AtlasInlinePrioritySelect({
         new_value: newPriority,
       });
 
-      // 6. UI sync
       setPriority(newPriority);
     } catch (err) {
       console.error("Priority update failed", err);

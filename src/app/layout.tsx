@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { Inter, Gilda_Display } from "next/font/google";
+import Script from "next/script";
+
 import { ThemeProvider } from "@/context/ThemeProvider";
-import { CookieProvider } from "./components/cookies/CookieContext";
-import CookieModal from "./components/cookies/CookieModal";
+import { CookieProvider } from "@/app/components/cookies/CookieContext";
+
 import "./globals.css";
 
+/* =========================
+   FONTS
+========================= */
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -16,6 +21,9 @@ const gilda = Gilda_Display({
   variable: "--font-gilda",
 });
 
+/* =========================
+   METADATA
+========================= */
 export const metadata: Metadata = {
   title: {
     default: "5 Star Weddings",
@@ -25,6 +33,9 @@ export const metadata: Metadata = {
     "Luxury wedding intelligence, partnerships, and concierge services.",
 };
 
+/* =========================
+   ROOT LAYOUT
+========================= */
 export default function RootLayout({
   children,
 }: {
@@ -33,7 +44,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* THEME + TYPOGRAPHY */}
         <style>{`
           :root {
             --bg-sidebar: #2D312F;
@@ -63,34 +73,29 @@ export default function RootLayout({
             font-family: var(--font-gilda), serif;
           }
         `}</style>
+      </head>
 
-        {/* GOOGLE ANALYTICS */}
-        <script
-          async
+      <body className={`${inter.variable} ${gilda.variable}`} data-app="core">
+        <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-NXSBQEWCZT"
+          strategy="afterInteractive"
         />
-        <script
+        <Script
+          id="ga-init"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', 'G-NXSBQEWCZT', {
-                anonymize_ip: true
-              });
+              gtag('config', 'G-NXSBQEWCZT', { anonymize_ip: true });
             `,
           }}
         />
-      </head>
 
-      <body
-        className={`${inter.variable} ${gilda.variable}`}
-        data-app="core"
-      >
         <ThemeProvider>
           <CookieProvider>
             {children}
-            <CookieModal />
           </CookieProvider>
         </ThemeProvider>
       </body>

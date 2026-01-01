@@ -1,31 +1,39 @@
-import { NextResponse } from "next/server";
-import type { DirectoryItem } from "@/types/edirectory"; // ✅ Works if '@' alias is set in tsconfig.json
-// If not using alias, use relative import instead:
-// import type { DirectoryItem } from "../../../../../types/edirectory";
+import { NextRequest, NextResponse } from "next/server";
 
-/** =========================================================
- *  Dynamic Vendor Details Route
- *  Path: /api/edirectory/vendor/[id]
- *  Purpose: Fetch full listing details from eDirectory
- *  ======================================================= */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** =========================================================
- *  Environment Variables
- *  ======================================================= */
+/* ---------------------------------
+   LOCAL TYPE (NO IMPORTS)
+---------------------------------- */
+type DirectoryItem = {
+  id: string | null;
+  title: string;
+  description: string;
+  url: string | null;
+  images: string[];
+  category: string | null;
+  location: string | null;
+  price_from: number | null;
+  rating: number | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+};
+
 const API_BASE = process.env.EDIRECTORY_API_BASE || "";
 const API_KEY = process.env.EDIRECTORY_API_KEY || "";
 const AUTH_SCHEME = process.env.EDIRECTORY_AUTH_SCHEME || "Bearer";
 
-/** =========================================================
- *  GET /api/edirectory/vendor/[id]
- *  ======================================================= */
+/* ---------------------------------
+   GET /api/edirectory/vendor/[id]
+   Next.js 15 SAFE
+---------------------------------- */
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+): Promise<Response> {
+  const { id } = await context.params;
 
   if (!API_BASE || !API_KEY) {
     return NextResponse.json(
@@ -34,22 +42,27 @@ export async function GET(
     );
   }
 
+  if (!id) {
+    return NextResponse.json(
+      { ok: false, error: "Missing vendor id" },
+      { status: 400 }
+    );
+  }
+
   try {
-    // Construct the upstream eDirectory endpoint
     const upstreamUrl = new URL(
       `/api/v2/listings/${encodeURIComponent(id)}`,
       API_BASE.endsWith("/") ? API_BASE : API_BASE + "/"
     );
 
-    // Prepare authentication headers
     const headers: Record<string, string> = { Accept: "application/json" };
+
     if (AUTH_SCHEME.toLowerCase().startsWith("api")) {
       headers["X-API-KEY"] = API_KEY;
     } else {
       headers["Authorization"] = `${AUTH_SCHEME} ${API_KEY}`;
     }
 
-    // Call the eDirectory API
     const res = await fetch(upstreamUrl.toString(), {
       method: "GET",
       headers,
@@ -59,6 +72,7 @@ export async function GET(
     if (!res.ok) {
       const text = await res.text();
       console.error("[edirectory vendor] Upstream error:", res.status, text);
+
       return NextResponse.json(
         { ok: false, error: `Upstream error ${res.status}` },
         { status: 502 }
@@ -67,7 +81,6 @@ export async function GET(
 
     const json = await res.json();
 
-    // Normalise the upstream response into your internal DirectoryItem format
     const listing: DirectoryItem = {
       id: json.id ?? json.listing_id ?? null,
       title: json.title ?? json.name ?? "",
@@ -76,10 +89,9 @@ export async function GET(
         json.friendly_url && API_BASE
           ? new URL(json.friendly_url, API_BASE).toString()
           : null,
-      images:
-        json.images?.length
-          ? json.images
-          : [json.image_url, json.cover_image, json.thumbnail].filter(Boolean),
+      images: Array.isArray(json.images) && json.images.length
+        ? json.images
+        : [json.image_url, json.cover_image, json.thumbnail].filter(Boolean),
       category:
         json.category ||
         json.categories?.[0]?.title ||
@@ -99,6 +111,7 @@ export async function GET(
     return NextResponse.json({ ok: true, listing });
   } catch (err: any) {
     console.error("[edirectory vendor] Fatal error:", err);
+
     return NextResponse.json(
       { ok: false, error: err?.message || "Unexpected server error" },
       { status: 500 }

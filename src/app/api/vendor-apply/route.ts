@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
     const supabase = getSupabaseAdmin();
-    if (!supabase) throw new Error("Supabase client not initialized");
 
     const body = await req.json();
 
@@ -25,25 +24,23 @@ export async function POST(req: Request) {
       message_to_editorial_team,
     } = body;
 
-    // 1. SAVE IN SUPABASE
+    // 1. Save application in Supabase
     const { data, error } = await supabase
       .from("vendor_applications")
-      .insert([
-        {
-          name,
-          email,
-          phone,
-          business_name,
-          website,
-          instagram,
-          years_in_business,
-          location,
-          category,
-          description,
-          message_to_editorial_team,
-          status: "new",
-        },
-      ])
+      .insert({
+        name,
+        email,
+        phone,
+        business_name,
+        website,
+        instagram,
+        years_in_business,
+        location,
+        category,
+        description,
+        message_to_editorial_team,
+        status: "new",
+      })
       .select()
       .single();
 
@@ -55,9 +52,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. SEND EMAIL TO YOU
+    // 2. Send notification email
     const html = `
-      <div style="font-family: Arial; line-height: 1.6;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>New Vendor Application</h2>
 
         <p><strong>Name:</strong> ${name}</p>
@@ -72,9 +69,8 @@ export async function POST(req: Request) {
         <p><strong>Location:</strong> ${location}</p>
         <p><strong>Category:</strong> ${category}</p>
 
-        <p><strong>Description:</strong><br>${description}</p>
-
-        <p><strong>Message to Editorial Team:</strong><br>${message_to_editorial_team}</p>
+        <p><strong>Description:</strong><br />${description}</p>
+        <p><strong>Message to Editorial Team:</strong><br />${message_to_editorial_team}</p>
 
         <hr />
         <p>Application ID: ${data.id}</p>
@@ -88,7 +84,7 @@ export async function POST(req: Request) {
       html,
     });
 
-    // 3. RETURN RESPONSE
+    // 3. Return success response
     return NextResponse.json({
       ok: true,
       id: data.id,
@@ -97,7 +93,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("VENDOR APPLY ROUTE ERROR:", err);
     return NextResponse.json(
-      { ok: false, error: err.message || "Unknown error" },
+      { ok: false, error: err?.message ?? "Unknown error" },
       { status: 500 }
     );
   }

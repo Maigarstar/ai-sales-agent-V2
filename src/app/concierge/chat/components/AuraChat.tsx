@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import AuraListingCard from "./AuraListingCard";
+import AuraListingCard from "@/app/components/AuraListingCard";
 
 interface AuraChatProps {
   isLightMode: boolean;
@@ -19,7 +19,7 @@ export default function AuraChat({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 🔒 READ ONBOARDING CONTEXT + INSTANT SEARCH
+  // Read onboarding context and auto search
   useEffect(() => {
     try {
       const storedQuery = localStorage.getItem("aura_initial_query");
@@ -86,7 +86,7 @@ export default function AuraChat({
         </p>
       </div>
 
-      {/* Input */}
+      {/* Search input */}
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto mb-12">
         <input
           value={query}
@@ -119,12 +119,12 @@ export default function AuraChat({
             listing={listing}
             isLightMode={isLightMode}
             isSelected={shortlist.some((s) => s?.url === listing.url)}
-            onSelect={onToggleShortlist}
+            onSelect={() => onToggleShortlist(listing)}
           />
         ))}
       </div>
 
-      {/* Empty State */}
+      {/* Empty state */}
       {!loading && listings.length === 0 && query && (
         <p className="text-center opacity-50 text-sm mt-20">
           No curated matches found. Try refining your search.

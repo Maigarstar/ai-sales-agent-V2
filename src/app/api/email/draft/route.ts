@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { createServerSupabase } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -10,7 +10,7 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    // ✅ Correct server-side Supabase client
+    // ✅ AWAIT the Supabase client
     const supabase = await createServerSupabase();
 
     const { lead_id } = await req.json();
@@ -58,7 +58,7 @@ ${conversation}
 
 Write a professional, warm, editorial-style email in HTML.
 Include a suggested subject line on the first line prefixed with "Subject:".
-    `.trim();
+`.trim();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -66,7 +66,7 @@ Include a suggested subject line on the first line prefixed with "Subject:".
       messages: [{ role: "user", content: prompt }],
     });
 
-    const reply = completion.choices[0].message?.content || "";
+    const reply = completion.choices[0].message?.content ?? "";
 
     const [subjectLine, ...bodyLines] = reply.split("\n");
 
@@ -75,7 +75,7 @@ Include a suggested subject line on the first line prefixed with "Subject:".
       html_body: bodyLines.join("\n").trim(),
     });
   } catch (err) {
-    console.error("Email draft error:", err);
+    console.error("EMAIL DRAFT ERROR:", err);
     return NextResponse.json(
       { error: "Failed to generate email draft" },
       { status: 500 }

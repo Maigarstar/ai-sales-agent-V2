@@ -1,7 +1,8 @@
 "use client";
 
 import { Share2, Bookmark, Calendar, ArrowLeft, Download, CheckCircle2 } from "lucide-react";
-import { supabase } from "@/supabase";
+// FIX: Updated path to match your actual Supabase browser client location
+import { createBrowserSupabase } from "@/lib/supabase/browser"; 
 
 interface ResultViewProps {
   generatedImageUrl: string;
@@ -11,6 +12,8 @@ interface ResultViewProps {
 }
 
 export default function ResultView({ generatedImageUrl, selectedDress, onReset, profile }: ResultViewProps) {
+  // Initialize Supabase inside the component or at the top level from the new path
+  const supabase = createBrowserSupabase();
   
   const handleSaveLook = async () => {
     if (!profile?.id) {

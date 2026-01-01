@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabaseBrowser } from "src/lib/supabase-browser";
+import { createBrowserSupabase } from "@/lib/supabase/browser";
 import { ArrowRight, Apple, Mail, ShieldCheck } from "lucide-react";
 
 const GOLD = "#C5A059";
@@ -11,7 +11,7 @@ export default function ConciergeLoginGate({
   onPrefill,
 }: {
   onAuthed: (session: any) => void;
-  onPrefill: (p: { name?: string; email?: string }) => void;
+  onPrefill?: (p: { name?: string; email?: string }) => void;
 }) {
   // DEV BYPASS: disable onboarding + auth entirely during development
   if (
@@ -22,20 +22,24 @@ export default function ConciergeLoginGate({
     return null;
   }
 
-  const sb = supabaseBrowser();
+  const supabase = createBrowserSupabase();
+
   const [step, setStep] = useState<"capture" | "auth">("capture");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // bubble up session when a user completes auth
+  // Bubble up session when auth completes
   useEffect(() => {
-    const { data: sub } = sb.auth.onAuthStateChange(async (_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) onAuthed(session);
     });
-    return () => sub.subscription.unsubscribe();
-  }, [sb, onAuthed]);
+
+    return () => subscription.unsubscribe();
+  }, [supabase, onAuthed]);
 
   async function startCapture(e: React.FormEvent) {
     e.preventDefault();
@@ -53,7 +57,8 @@ export default function ConciergeLoginGate({
           source: "concierge",
         }),
       });
-      onPrefill({ name, email });
+
+      onPrefill?.({ name, email });
       setStep("auth");
     } catch (err: any) {
       setError(err?.message ?? "Could not start. Please try again.");
@@ -66,7 +71,7 @@ export default function ConciergeLoginGate({
     setBusy(true);
     setError(null);
     try {
-      await sb.auth.signInWithOAuth({
+      await supabase.auth.signInWithOAuth({
         provider: "apple",
         options: {
           redirectTo: `${window.location.origin}/wedding-concierge/chat`,
@@ -82,7 +87,7 @@ export default function ConciergeLoginGate({
     setBusy(true);
     setError(null);
     try {
-      await sb.auth.signInWithOAuth({
+      await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/wedding-concierge/chat`,
@@ -98,7 +103,7 @@ export default function ConciergeLoginGate({
     setBusy(true);
     setError(null);
     try {
-      await sb.auth.signInWithOtp({
+      await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/wedding-concierge/chat`,
@@ -112,7 +117,10 @@ export default function ConciergeLoginGate({
     }
   }
 
-  // STEP 1: capture
+  /* ======================
+     STEP 1: Capture
+  ====================== */
+
   if (step === "capture") {
     return (
       <div className="min-h-screen bg-white text-[#112620] flex items-center justify-center p-6">
@@ -137,6 +145,7 @@ export default function ConciergeLoginGate({
               placeholder="Your name"
               className="w-full rounded-full border border-neutral-300 px-5 py-4"
             />
+
             <input
               required
               type="email"
@@ -160,7 +169,8 @@ export default function ConciergeLoginGate({
           </form>
 
           <p className="mt-4 text-center text-xs opacity-70">
-            Your details let Aura personalise your shortlist, then you can sign in to save everything
+            Your details let Aura personalise your shortlist, then you can sign in
+            to save everything
           </p>
 
           <div className="mt-8 text-center text-xs text-neutral-500">
@@ -171,7 +181,10 @@ export default function ConciergeLoginGate({
     );
   }
 
-  // STEP 2: auth
+  /* ======================
+     STEP 2: Auth
+  ====================== */
+
   return (
     <div className="min-h-screen bg-white text-[#112620] flex items-center justify-center p-6">
       <div className="w-full max-w-lg">

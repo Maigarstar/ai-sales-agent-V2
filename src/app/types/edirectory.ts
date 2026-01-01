@@ -9,6 +9,14 @@ import type { DirectoryItem } from "@/types/edirectory";
  * =========================================================
  */
 
+type SearchDirectoryResponse = {
+  ok: true;
+  total: number;
+  page: number;
+  pageSize: number;
+  items: DirectoryItem[];
+};
+
 /** -----------------------------------------------
  * Search eDirectory listings (venues, planners, etc.)
  * ---------------------------------------------- */
@@ -18,9 +26,9 @@ export async function searchDirectory(params: {
   location?: string;
   page?: number;
   pageSize?: number;
-}) {
+}): Promise<SearchDirectoryResponse> {
   const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const url = new URL(`${base}/api/edirectory/search`);
+  const url = new URL("/api/edirectory/search", base);
 
   if (params.q) url.searchParams.set("q", params.q);
   if (params.category) url.searchParams.set("category", params.category);
@@ -29,16 +37,21 @@ export async function searchDirectory(params: {
   if (params.pageSize) url.searchParams.set("pageSize", String(params.pageSize));
 
   const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) throw new Error(`Directory bridge failed with ${res.status}`);
+  if (!res.ok) {
+    throw new Error(`Directory bridge failed with ${res.status}`);
+  }
 
   const data = await res.json();
-  if (!data?.ok) throw new Error(data?.error || "Unknown error");
+
+  if (!data?.ok || !Array.isArray(data.results)) {
+    throw new Error(data?.error || "Invalid directory response");
+  }
 
   return {
     ok: true,
-    total: data.total || 0,
-    page: data.page || 1,
-    pageSize: data.pageSize || data.results?.length || 0,
+    total: Number(data.total) || 0,
+    page: Number(data.page) || 1,
+    pageSize: Number(data.pageSize) || data.results.length || 0,
     items: data.results as DirectoryItem[],
   };
 }
@@ -48,10 +61,20 @@ export async function searchDirectory(params: {
  * ---------------------------------------------- */
 export async function fetchVendor(id: string): Promise<DirectoryItem> {
   const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const res = await fetch(`${base}/api/edirectory/vendor/${id}`, {
-    cache: "no-store",
-  });
+  const res = await fetch(
+    new URL(`/api/edirectory/vendor/${id}`, base).toString(),
+    { cache: "no-store" }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Vendor fetch failed with ${res.status}`);
+  }
+
   const data = await res.json();
-  if (!data.ok) throw new Error(data.error || "Failed to fetch vendor");
-  return data.listing;
+
+  if (!data?.ok || !data.listing) {
+    throw new Error(data?.error || "Invalid vendor response");
+  }
+
+  return data.listing as DirectoryItem;
 }

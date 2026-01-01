@@ -1,30 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import CookieModal from "./CookieModal"; // The pop-up component
+import { useCookies } from "@/app/components/cookies/CookieContext";
+import CookieModal from "@/app/components/cookies/CookieModal";
 
 export default function PublicFooter() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { open } = useCookies();
 
   return (
-    <footer style={footerStyle}>
-      <div style={contentStyle}>
-        <span>Powered by Taigenic.ai</span>
-        <span style={dividerStyle}>•</span>
-        <span>5 Star Weddings Ltd. 2006 2025</span>
-        <span style={dividerStyle}>•</span>
-        <span>
-          See{" "}
-          <button onClick={() => setIsModalOpen(true)} style={cookieBtn}>
-            Cookie Preferences
-          </button>
-        </span>
-      </div>
+    <>
+      <footer style={footerStyle}>
+        <div style={contentStyle}>
+          <span>Powered by Taigenic.ai</span>
+          <span style={dividerStyle}>•</span>
+          <span>5 Star Weddings Ltd. 2006 2025</span>
+          <span style={dividerStyle}>•</span>
+          <span>Cookie Preferences</span>
+        </div>
+      </footer>
 
-      <CookieModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    </footer>
+      {/* Global cookie banner */}
+      {open && <CookieModal />}
+    </>
   );
 }
+
+/* ===== STYLES ===== */
 
 const footerStyle = {
   width: "100%",
@@ -41,19 +41,11 @@ const contentStyle = {
   letterSpacing: "0.5px",
   display: "flex",
   gap: "8px",
-  flexWrap: "wrap" as "wrap",
+  flexWrap: "wrap" as const,
   justifyContent: "center",
 };
 
-const dividerStyle = { color: "#ccc", margin: "0 4px" };
-
-const cookieBtn = {
-  background: "none",
-  border: "none",
-  padding: 0,
-  fontSize: "12px",
-  color: "#888",
-  textDecoration: "underline",
-  cursor: "pointer",
-  fontFamily: "inherit",
+const dividerStyle = {
+  color: "#ccc",
+  margin: "0 4px",
 };

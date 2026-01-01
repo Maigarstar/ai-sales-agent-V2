@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createServerSupabase } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
 
 export default async function VendorsChatPage() {
+  // ✅ MUST await the Supabase client
   const supabase = await createServerSupabase();
 
   const {

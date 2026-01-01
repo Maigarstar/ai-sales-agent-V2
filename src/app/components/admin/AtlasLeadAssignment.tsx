@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { calculateDealProbability } from "src/lib/atlas/calculateDealProbability";
+import { calculateDealProbability } from "@/lib/atlas/calculateDealProbability";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -60,7 +60,6 @@ export default function AtlasLeadAssignment({
         data: { user },
       } = await supabase.auth.getUser();
 
-      // Fetch lead inputs for probability calculation
       const { data: lead } = await supabase
         .from("vendor_leads")
         .select(`
@@ -76,10 +75,13 @@ export default function AtlasLeadAssignment({
         .eq("id", leadId)
         .single();
 
+      if (!lead) {
+        throw new Error("Lead not found");
+      }
+
       const previousUser = users.find((u) => u.id === assignedTo);
       const nextUser = users.find((u) => u.id === userId);
 
-      // Update assignment
       await supabase
         .from("vendor_leads")
         .update({
@@ -89,11 +91,14 @@ export default function AtlasLeadAssignment({
         })
         .eq("id", leadId);
 
-      // Recalculate deal probability
-      const probability = calculateDealProbability({
+      // 🔒 GUARANTEE REQUIRED FIELDS
+      const safeLead = {
         ...lead,
+        score: lead.score ?? 0,
         assigned_to: userId,
-      });
+      };
+
+      const probability = calculateDealProbability(safeLead);
 
       await supabase
         .from("vendor_leads")
@@ -102,7 +107,6 @@ export default function AtlasLeadAssignment({
         })
         .eq("id", leadId);
 
-      // Audit trail
       await supabase.from("lead_audit_logs").insert({
         lead_id: leadId,
         changed_by: user?.id ?? null,

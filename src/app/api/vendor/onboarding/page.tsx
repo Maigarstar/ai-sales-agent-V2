@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/src/app/_lib/supabaseClient";
 import { Loader2, CheckCircle, ArrowRight } from "lucide-react";
+
+import { createBrowserSupabase } from "@/lib/supabase/browser";
 
 /**
  * 5 STAR WEDDINGS — PARTNER ONBOARDING
- * Fixed: Self-contained components to prevent 404/Import errors.
+ * App Router compliant
+ * No legacy imports
  */
 export default function VendorOnboardingPage() {
+  const supabase = createBrowserSupabase();
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -21,17 +25,24 @@ export default function VendorOnboardingPage() {
   const totalSteps = 3;
 
   const handleNext = async () => {
-    if (step < totalSteps) return setStep(step + 1);
+    if (step < totalSteps) {
+      setStep(step + 1);
+      return;
+    }
 
     try {
       setLoading(true);
-      const { error } = await supabase.from("vendor_applications").insert({
-        ...form,
-        status: "pending",
-        submitted_at: new Date().toISOString(),
-      });
+
+      const { error } = await supabase
+        .from("vendor_applications")
+        .insert({
+          ...form,
+          status: "pending",
+          submitted_at: new Date().toISOString(),
+        });
 
       if (error) throw error;
+
       setStep(4);
     } catch (err: any) {
       alert(err.message || "An error occurred. Please try again.");
@@ -45,72 +56,101 @@ export default function VendorOnboardingPage() {
       <div style={container}>
         {/* HEADER */}
         <header style={{ textAlign: "center", marginBottom: "40px" }}>
-          <h1 style={titleStyle}>PARTNER <span style={{ color: "#C5A059" }}>ONBOARDING</span></h1>
-          <p style={subtitleStyle}>Apply for elite access to the 5 Star Weddings network.</p>
+          <h1 style={titleStyle}>
+            PARTNER <span style={{ color: "#C5A059" }}>ONBOARDING</span>
+          </h1>
+          <p style={subtitleStyle}>
+            Apply for elite access to the 5 Star Weddings network.
+          </p>
         </header>
 
         {/* PROGRESS BAR */}
         <div style={progressContainer}>
-          <div style={{ ...progressFill, width: `${(step / totalSteps) * 100}%` }} />
+          <div
+            style={{
+              ...progressFill,
+              width: `${(step / totalSteps) * 100}%`,
+            }}
+          />
         </div>
 
         {/* STEP CONTENT */}
         <div style={cardStyle}>
           {step === 1 && (
-            <div>
+            <>
               <h2 style={cardTitle}>Brand Identity</h2>
-              <p style={cardSubtitle}>Tell us about your boutique and your unique value.</p>
+              <p style={cardSubtitle}>
+                Tell us about your boutique and your unique value.
+              </p>
               <input
                 style={inputStyle}
                 placeholder="Brand Name"
                 value={form.brand_name}
-                onChange={(e) => setForm({ ...form, brand_name: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, brand_name: e.target.value })
+                }
               />
               <input
                 style={inputStyle}
                 placeholder="Website URL"
                 value={form.website}
-                onChange={(e) => setForm({ ...form, website: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, website: e.target.value })
+                }
               />
-            </div>
+            </>
           )}
 
           {step === 2 && (
-            <div>
+            <>
               <h2 style={cardTitle}>Contact Information</h2>
-              <p style={cardSubtitle}>How can our concierge team reach you?</p>
+              <p style={cardSubtitle}>
+                How can our concierge team reach you?
+              </p>
               <input
                 style={inputStyle}
                 placeholder="Contact Email"
                 value={form.contact_email}
-                onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, contact_email: e.target.value })
+                }
               />
               <textarea
                 style={{ ...inputStyle, height: "120px", resize: "none" }}
                 placeholder="Describe your services..."
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
               />
-            </div>
+            </>
           )}
 
           {step === 3 && (
-            <div>
+            <>
               <h2 style={cardTitle}>Final Review</h2>
-              <p style={cardSubtitle}>Ensure your intelligence manifest is accurate.</p>
+              <p style={cardSubtitle}>
+                Ensure your intelligence manifest is accurate.
+              </p>
               <div style={reviewBox}>
                 <p><strong>BRAND:</strong> {form.brand_name || "—"}</p>
                 <p><strong>WEBSITE:</strong> {form.website || "—"}</p>
                 <p><strong>EMAIL:</strong> {form.contact_email || "—"}</p>
               </div>
-            </div>
+            </>
           )}
 
           {step === 4 && (
             <div style={{ textAlign: "center", padding: "40px 0" }}>
-              <CheckCircle size={48} color="#C5A059" style={{ marginBottom: "20px" }} />
+              <CheckCircle
+                size={48}
+                color="#C5A059"
+                style={{ marginBottom: "20px" }}
+              />
               <h2 style={cardTitle}>Manifest Received</h2>
-              <p style={cardSubtitle}>Our team will review your application shortly.</p>
+              <p style={cardSubtitle}>
+                Our team will review your application shortly.
+              </p>
             </div>
           )}
 
@@ -120,7 +160,13 @@ export default function VendorOnboardingPage() {
               disabled={loading}
               style={primaryBtn}
             >
-              {loading ? <Loader2 className="animate-spin" /> : <>CONTINUE <ArrowRight size={16} /></>}
+              {loading ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <>
+                  CONTINUE <ArrowRight size={16} />
+                </>
+              )}
             </button>
           )}
         </div>
@@ -129,7 +175,7 @@ export default function VendorOnboardingPage() {
   );
 }
 
-/* === ELITE MIDNIGHT STYLES === */
+/* === STYLES === */
 
 const pageWrapper: React.CSSProperties = {
   backgroundColor: "#0A0C0B",
@@ -139,7 +185,7 @@ const pageWrapper: React.CSSProperties = {
   alignItems: "center",
   padding: "20px",
   color: "#E0E7E5",
-  fontFamily: "'Nunito Sans', sans-serif"
+  fontFamily: "'Nunito Sans', sans-serif",
 };
 
 const container = { maxWidth: "480px", width: "100%" };
@@ -148,38 +194,47 @@ const titleStyle: React.CSSProperties = {
   fontFamily: "'Gilda Display', serif",
   fontSize: "28px",
   letterSpacing: "3px",
-  margin: 0
+  margin: 0,
 };
 
 const subtitleStyle = {
   fontSize: "12px",
   color: "#94A39F",
   marginTop: "10px",
-  letterSpacing: "1px"
+  letterSpacing: "1px",
 };
 
 const progressContainer = {
   height: "2px",
   backgroundColor: "rgba(255,255,255,0.05)",
   marginBottom: "32px",
-  overflow: "hidden"
 };
 
 const progressFill = {
   height: "100%",
   backgroundColor: "#C5A059",
-  transition: "width 0.4s ease"
+  transition: "width 0.4s ease",
 };
 
 const cardStyle = {
   backgroundColor: "#141615",
   padding: "40px",
-  borderRadius: "6px", // Strict 6px Radius
-  border: "1px solid rgba(255,255,255,0.05)"
+  borderRadius: "6px",
+  border: "1px solid rgba(255,255,255,0.05)",
 };
 
-const cardTitle = { fontSize: "18px", fontWeight: 700, color: "#C5A059", marginBottom: "8px" };
-const cardSubtitle = { fontSize: "13px", color: "#94A39F", marginBottom: "24px" };
+const cardTitle = {
+  fontSize: "18px",
+  fontWeight: 700,
+  color: "#C5A059",
+  marginBottom: "8px",
+};
+
+const cardSubtitle = {
+  fontSize: "13px",
+  color: "#94A39F",
+  marginBottom: "24px",
+};
 
 const inputStyle = {
   width: "100%",
@@ -190,7 +245,6 @@ const inputStyle = {
   color: "#fff",
   fontSize: "14px",
   marginBottom: "16px",
-  outline: "none"
 };
 
 const primaryBtn = {
@@ -208,7 +262,6 @@ const primaryBtn = {
   alignItems: "center",
   justifyContent: "center",
   gap: "10px",
-  marginTop: "12px"
 };
 
 const reviewBox = {
@@ -217,5 +270,5 @@ const reviewBox = {
   borderRadius: "6px",
   fontSize: "12px",
   color: "#94A39F",
-  lineHeight: "2"
+  lineHeight: "2",
 };

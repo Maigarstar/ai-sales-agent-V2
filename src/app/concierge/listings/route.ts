@@ -11,10 +11,14 @@ export async function GET(req: Request) {
   }
 
   try {
-    const raw = await searchDirectory(q);
+    const raw = await searchDirectory({
+      q,
+      page: 1,
+      pageSize: 12,
+    });
 
-    const listings = raw
-      .map(item =>
+    const listings = raw.items
+      .map((item) =>
         normalizeEDirectoryListing(
           item,
           "https://5starweddingdirectory.com"
@@ -22,7 +26,11 @@ export async function GET(req: Request) {
       )
       .filter(Boolean);
 
-    return NextResponse.json({ ok: true, listings });
+    return NextResponse.json({
+      ok: true,
+      total: raw.total,
+      listings,
+    });
   } catch (error: any) {
     console.error("Concierge search error:", error.message);
     return NextResponse.json(

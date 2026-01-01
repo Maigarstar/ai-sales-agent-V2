@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { createClient } from "src/lib/supabase/client";
+import { useEffect, useState, useCallback } from "react";
+import { createBrowserSupabase } from "@/lib/supabase/browser";
+
+/* ================================
+   TYPES
+================================ */
 
 export type Profile = {
   id: string;
   updated_at: string | null;
   full_name: string | null;
   phone_number: string | null;
-  user_type: "vendor" | "couple" | "admin" | null; // Added admin for safety
+  user_type: "vendor" | "couple" | "admin" | null;
   onboarding_complete: boolean | null;
   business_name: string | null;
   website: string | null;
   wedding_date: string | null;
   destination_preference: string | null;
-  coins?: number; // Added to support the Styling Lab balance
+  coins?: number;
 };
 
 type UseProfileResult = {
@@ -23,26 +27,36 @@ type UseProfileResult = {
   loading: boolean;
   signedIn: boolean;
   refresh: () => Promise<void>;
-  refreshProfile: () => Promise<void>; // ✅ Added for Styling Lab compatibility
+  refreshProfile: () => Promise<void>;
 };
 
+/* ================================
+   SINGLETON CLIENT
+================================ */
+
+// Create once per module, not per render
+const supabase = createBrowserSupabase();
+
+/* ================================
+   HOOK
+================================ */
+
 export function useProfile(): UseProfileResult {
-  const supabase = useMemo(() => createClient(), []);
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Use useCallback to prevent unnecessary re-renders in effects
   const fetchProfile = useCallback(async () => {
     setLoading(true);
+
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const user = auth?.user ?? null;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) {
         setUserId(null);
         setProfile(null);
-        setLoading(false);
         return;
       }
 
@@ -59,32 +73,35 @@ export function useProfile(): UseProfileResult {
       } else {
         setProfile(data as Profile);
       }
-    } catch {
+    } catch (err) {
+      console.error("useProfile error:", err);
       setUserId(null);
       setProfile(null);
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchProfile();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
       fetchProfile();
     });
 
     return () => {
-      sub?.subscription?.unsubscribe();
+      subscription?.unsubscribe();
     };
-  }, [supabase, fetchProfile]);
+  }, [fetchProfile]);
 
   return {
     userId,
     profile,
     loading,
-    signedIn: !!userId,
+    signedIn: Boolean(userId),
     refresh: fetchProfile,
-    refreshProfile: fetchProfile, // ✅ Pointing to the same function
+    refreshProfile: fetchProfile,
   };
 }

@@ -1,27 +1,43 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Sparkles, Send, User, Mic, AudioLines, RefreshCw } from "lucide-react";
 
 export default function AuraLiveSimulation() {
   const [mounted, setMounted] = useState(false);
-  const [messages, setMessages] = useState<{ role: "user" | "aura"; text: string }[]>([]);
+  const [messages, setMessages] = useState<
+    { role: "user" | "aura"; text: string }[]
+  >([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-  );
+  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const isConfigured = !!(envUrl && envKey);
+
+  const supabase = useMemo(() => {
+    if (!isConfigured) return null;
+    return createBrowserClient(envUrl!, envKey!);
+  }, [envUrl, envKey, isConfigured]);
 
   useEffect(() => {
     setMounted(true);
+    if (!supabase) return;
+
     const fetchAuraConfig = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (user) {
-        const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
         setMessages([
           {
             role: "aura",
@@ -32,21 +48,25 @@ export default function AuraLiveSimulation() {
         ]);
       }
     };
+
     fetchAuraConfig();
-  }, []);
+  }, [supabase]);
 
   const handleSendMessage = () => {
     if (!input.trim()) return;
+
     setMessages((prev) => [...prev, { role: "user", text: input }]);
     setInput("");
     setIsTyping(true);
+
     setTimeout(() => {
       setIsTyping(false);
       setMessages((prev) => [
         ...prev,
         {
           role: "aura",
-          text: "I’ve noted your request and am aligning it with our luxury standards.",
+          text:
+            "I’ve noted your request and am aligning it with our luxury standards.",
         },
       ]);
     }, 1200);
@@ -54,8 +74,15 @@ export default function AuraLiveSimulation() {
 
   if (!mounted) return null;
 
-  const isInputActive = input.length > 0;
-  const sendButtonColor = isInputActive ? "#183F34" : "#C8CFC9";
+  if (!isConfigured) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "#666" }}>
+        Supabase is not configured for this environment.
+      </div>
+    );
+  }
+
+  const sendButtonColor = input.length > 0 ? "#183F34" : "#C8CFC9";
 
   return (
     <div style={container}>
@@ -81,13 +108,14 @@ export default function AuraLiveSimulation() {
                 <User size={16} color="#FFF" />
               )}
             </div>
-            <div style={msg.role === "aura" ? auraBubble : userBubble}>{msg.text}</div>
+            <div style={msg.role === "aura" ? auraBubble : userBubble}>
+              {msg.text}
+            </div>
           </div>
         ))}
+
         {isTyping && (
-          <div style={{ marginLeft: "48px", color: "#C8A165", fontSize: "13px" }}>
-            Aura is thinking...
-          </div>
+          <div style={typingText}>Aura is thinking…</div>
         )}
       </div>
 
@@ -100,11 +128,12 @@ export default function AuraLiveSimulation() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
           />
+
           <div style={actionButtons}>
-            <button style={circleBtn} className="aura-icon">
+            <button style={circleBtn}>
               <Mic size={18} color="#183F34" />
             </button>
-            <button style={circleBtn} className="aura-icon">
+            <button style={circleBtn}>
               <AudioLines size={18} color="#183F34" />
             </button>
             <button
@@ -114,7 +143,6 @@ export default function AuraLiveSimulation() {
                 backgroundColor: sendButtonColor,
                 border: "none",
               }}
-              className="aura-icon"
             >
               <Send size={16} color="#FFF" />
             </button>
@@ -123,7 +151,8 @@ export default function AuraLiveSimulation() {
 
         <div style={footerMeta}>
           <div style={tipText}>
-            Tip, open anytime: <span style={linkHighlight}>5starweddingdirectory.com</span>
+            Tip, open anytime:{" "}
+            <span style={linkHighlight}>5starweddingdirectory.com</span>
           </div>
           <div style={createAccountText}>Create account</div>
         </div>
@@ -132,153 +161,139 @@ export default function AuraLiveSimulation() {
   );
 }
 
-/* =========================================================
-   STYLING ENGINE: GOLD STAR + ROUND ICONS
-   ========================================================= */
+/* ================= STYLES ================= */
+
 const container = {
-  height: "calc(100vh - 120px)",
-  display: "flex",
-  flexDirection: "column" as const,
-  fontFamily: "'Gilda Display', serif",
-  background: "#FAFAF9",
+  maxWidth: 900,
+  margin: "0 auto",
+  padding: "60px 20px",
+  fontFamily: "'Nunito Sans', sans-serif",
 };
 
 const header = {
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "flex-end",
-  marginBottom: "32px",
-};
-const badge = {
-  display: "flex",
   alignItems: "center",
-  gap: "6px",
-  color: "#C8A165",
-  fontSize: "10px",
-  fontWeight: "700",
-  letterSpacing: "2px",
-  textTransform: "uppercase" as const,
+  marginBottom: 30,
 };
+
+const badge = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  background: "#F5F1EA",
+  color: "#C5A059",
+  padding: "6px 12px",
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 700,
+};
+
 const title = {
-  fontSize: "32px",
-  color: "#183F34",
-  marginTop: "8px",
+  fontFamily: "'Gilda Display', serif",
+  fontSize: 34,
+  marginTop: 12,
+};
+
+const resetBtn = {
+  background: "none",
+  border: "1px solid #E5E7EB",
+  padding: "8px 14px",
+  borderRadius: 12,
+  cursor: "pointer",
+  display: "flex",
+  gap: 6,
+  alignItems: "center",
 };
 
 const chatBox = {
-  flex: 1,
-  overflowY: "auto" as const,
-  display: "flex",
-  flexDirection: "column" as const,
-  gap: "20px",
-  padding: "20px 0",
-};
-const auraRow = { display: "flex", gap: "12px", alignSelf: "flex-start", maxWidth: "80%" };
-const userRow = {
-  display: "flex",
-  gap: "12px",
-  alignSelf: "flex-end",
-  flexDirection: "row-reverse" as const,
-  maxWidth: "80%",
+  border: "1px solid #EEE",
+  borderRadius: 20,
+  padding: 24,
+  minHeight: 380,
+  marginBottom: 30,
 };
 
-const auraBubble = {
-  backgroundColor: "#F3F4F6",
-  color: "#2D312F",
-  padding: "14px 20px",
-  borderRadius: "20px 20px 20px 4px",
-  fontSize: "15px",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-};
-const userBubble = {
-  backgroundColor: "#183F34",
-  color: "#FFF",
-  padding: "14px 20px",
-  borderRadius: "20px 20px 4px 20px",
-  fontSize: "15px",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-};
+const auraRow = { display: "flex", gap: 14, marginBottom: 18 };
+const userRow = { ...auraRow, justifyContent: "flex-end" };
 
 const specialistIcon = {
-  width: "40px",
-  height: "40px",
-  backgroundColor: "#FFF",
+  width: 36,
+  height: 36,
   borderRadius: "50%",
-  border: "1px solid #C8A165",
+  background: "#C5A059",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  flexShrink: 0,
-};
-const goldStar = {
-  color: "#C8A165",
-  fontSize: "18px",
-};
-const userIcon = {
-  width: "40px",
-  height: "40px",
-  backgroundColor: "#C8A165",
-  borderRadius: "50%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
+  color: "#FFF",
 };
 
-const inputSectionWrapper = { width: "100%", padding: "20px 0" };
+const userIcon = {
+  ...specialistIcon,
+  background: "#183F34",
+};
+
+const goldStar = { fontSize: 16 };
+
+const auraBubble = {
+  background: "#F9F7F3",
+  padding: "12px 16px",
+  borderRadius: 16,
+  maxWidth: 520,
+};
+
+const userBubble = {
+  ...auraBubble,
+  background: "#183F34",
+  color: "#FFF",
+};
+
+const typingText = {
+  marginLeft: 48,
+  color: "#C8A165",
+  fontSize: 13,
+};
+
+const inputSectionWrapper = { marginTop: 20 };
+
 const pillInputContainer = {
   display: "flex",
   alignItems: "center",
-  backgroundColor: "#FFF",
   border: "1px solid #E5E7EB",
-  borderRadius: "100px",
-  padding: "8px 8px 8px 24px",
-  minHeight: "56px",
-  maxWidth: "800px",
-  margin: "0 auto",
-  boxShadow: "0 3px 8px rgba(0,0,0,0.05)",
+  borderRadius: 999,
+  padding: "8px 12px",
 };
+
 const pillField = {
   flex: 1,
   border: "none",
   outline: "none",
-  fontSize: "16px",
-  color: "#222",
+  padding: "10px 14px",
+  fontSize: 14,
 };
-const actionButtons = { display: "flex", alignItems: "center", gap: "8px" };
+
+const actionButtons = { display: "flex", gap: 6 };
 
 const circleBtn = {
-  width: "44px",
-  height: "44px",
+  width: 36,
+  height: 36,
   borderRadius: "50%",
+  border: "1px solid #E5E7EB",
+  background: "#FFF",
+  cursor: "pointer",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  cursor: "pointer",
-  flexShrink: 0,
-  border: "1px solid #E5E7EB",
-  background: "#FFF",
-  transition: "all 0.3s ease",
-  boxShadow: "0 2px 3px rgba(0,0,0,0.04)",
 };
 
 const footerMeta = {
   display: "flex",
   justifyContent: "space-between",
-  marginTop: "12px",
-  padding: "0 10px",
-  maxWidth: "800px",
-  margin: "12px auto 0 auto",
+  marginTop: 12,
+  fontSize: 12,
+  color: "#777",
 };
-const tipText = { fontSize: "13px", color: "#999" };
-const linkHighlight = { color: "#183F34", fontWeight: "600" };
-const createAccountText = { fontSize: "13px", color: "#183F34", fontWeight: "600", cursor: "pointer" };
-const resetBtn = {
-  background: "none",
-  border: "1px solid #E5E7EB",
-  padding: "8px 16px",
-  borderRadius: "6px",
-  fontSize: "12px",
-  color: "#183F34",
-  cursor: "pointer",
-};
+
+const tipText = {};
+const linkHighlight = { color: "#C5A059", fontWeight: 700 };
+const createAccountText = { cursor: "pointer" };

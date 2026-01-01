@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createAdminClient } from "src/lib/supabase/admin";
+import { getSupabaseAdmin } from "src/lib/supabase/admin";
 
 type VendorApplication = {
   id: string;
@@ -13,7 +13,7 @@ type VendorApplication = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminVendorApplicationsPage() {
-  const supabase = createAdminClient();
+  const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
     .from("vendor_applications")
@@ -73,7 +73,9 @@ export default async function AdminVendorApplicationsPage() {
               }}
             >
               <div>
-                <div style={{ fontWeight: 600 }}>{app.business_name || "Untitled"}</div>
+                <div style={{ fontWeight: 600 }}>
+                  {app.business_name || "Untitled"}
+                </div>
                 <div style={{ color: "#777" }}>ID: {app.id}</div>
               </div>
 
@@ -83,15 +85,23 @@ export default async function AdminVendorApplicationsPage() {
               </div>
 
               <div style={{ color: "#555" }}>
-                {app.created_at ? new Date(app.created_at).toLocaleString("en-GB") : "Unknown"}
+                {app.created_at
+                  ? new Date(app.created_at).toLocaleString("en-GB")
+                  : "Unknown"}
               </div>
 
-              <div style={{ textTransform: "capitalize" }}>{app.status || "new"}</div>
+              <div style={{ textTransform: "capitalize" }}>
+                {app.status || "new"}
+              </div>
 
               <div>
                 <Link
                   href={`/admin/vendor-applications/${app.id}`}
-                  style={{ fontSize: 13, color: "#183F34", textDecoration: "underline" }}
+                  style={{
+                    fontSize: 13,
+                    color: "#183F34",
+                    textDecoration: "underline",
+                  }}
                 >
                   Open
                 </Link>

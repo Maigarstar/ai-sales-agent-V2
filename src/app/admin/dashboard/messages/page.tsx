@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createServerSupabase } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
 
 export default async function MessagesPage() {
   const supabase = await createServerSupabase();
@@ -13,7 +13,6 @@ export default async function MessagesPage() {
     redirect("/login");
   }
 
-  // Fetch only messages belonging to this specific user
   const { data: conversations, error } = await supabase
     .from("conversations")
     .select("*")

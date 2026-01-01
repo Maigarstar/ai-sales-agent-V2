@@ -1,19 +1,18 @@
 import { NextResponse } from "next/server";
-
 import { Resend } from "resend";
+
+// ✅ ADD THIS IMPORT
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function POST(req: Request) {
   try {
+    // ✅ ADMIN CLIENT
     const supabase = getSupabaseAdmin();
-
-    if (!supabase) {
-      return NextResponse.json(
-        { ok: false, error: "Supabase client not configured" },
-        { status: 500 }
-      );
-    }
 
     const { id, status } = await req.json();
 
@@ -24,22 +23,22 @@ export async function POST(req: Request) {
       );
     }
 
-    // Fetch the vendor application
+    // 🔍 Fetch application
     const { data, error: fetchError } = await supabase
       .from("vendor_applications")
       .select("*")
       .eq("id", id)
       .single();
 
-    if (fetchError) {
+    if (fetchError || !data) {
       console.error("Fetch error:", fetchError);
       return NextResponse.json(
-        { ok: false, error: fetchError.message },
+        { ok: false, error: fetchError?.message || "Application not found" },
         { status: 500 }
       );
     }
 
-    // Update the application status
+    // ✏️ Update status
     const { error: updateError } = await supabase
       .from("vendor_applications")
       .update({ status })
@@ -53,7 +52,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Send approval email
+    // 📧 Email notifications
     if (status === "approved") {
       await resend.emails.send({
         from: "5 Star Weddings <concierge@5starweddingdirectory.com>",
@@ -66,7 +65,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Send declined email
     if (status === "declined") {
       await resend.emails.send({
         from: "5 Star Weddings <concierge@5starweddingdirectory.com>",
@@ -83,7 +81,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("POST /admin/leads/update-vendor-status error:", err);
     return NextResponse.json(
-      { ok: false, error: err.message || "Unknown error" },
+      { ok: false, error: err?.message || "Unknown error" },
       { status: 500 }
     );
   }

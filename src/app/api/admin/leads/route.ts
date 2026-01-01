@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -42,11 +42,14 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ ok: true, leads: data ?? [] }, { status: 200 });
+    return NextResponse.json(
+      { ok: true, leads: data ?? [] },
+      { status: 200 }
+    );
   } catch (err: any) {
     console.error("ADMIN LEADS ROUTE ERROR:", err);
     return NextResponse.json(
-      { ok: false, error: err.message || "Unknown error" },
+      { ok: false, error: err?.message || "Unknown error" },
       { status: 500 }
     );
   }

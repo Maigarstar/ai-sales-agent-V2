@@ -1,6 +1,5 @@
 "use client";
 
-import { writeAuditLog } from "@/lib/audit/writeAuditLog";
 import { createClient } from "@supabase/supabase-js";
 import { useState } from "react";
 import { Crown } from "lucide-react";
@@ -15,10 +14,13 @@ export default function InviteToPlatinum({ leadId }: { leadId: string }) {
 
   async function invite() {
     if (sending) return;
-
     setSending(true);
 
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       await supabase
         .from("vendor_leads")
         .update({
@@ -26,11 +28,17 @@ export default function InviteToPlatinum({ leadId }: { leadId: string }) {
         })
         .eq("id", leadId);
 
-      await writeAuditLog({
-        leadId,
-        actionType: "platinum_invite_sent",
-        newValue: "invited",
+      // ✅ INLINE AUDIT LOG (no missing import)
+      await supabase.from("lead_audit_logs").insert({
+        lead_id: leadId,
+        changed_by: user?.id ?? null,
+        full_name: user?.user_metadata?.full_name || "System",
+        action_type: "platinum_invite_sent",
+        old_value: null,
+        new_value: "invited",
       });
+    } catch (err) {
+      console.error("Platinum invite failed", err);
     } finally {
       setSending(false);
     }

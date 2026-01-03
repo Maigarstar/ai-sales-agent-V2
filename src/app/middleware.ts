@@ -1,11 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// ✅ Safe redirect helper
 function safeNextParam(pathname: string) {
-  if (!pathname || !pathname.startsWith("/") || pathname.startsWith("//")) {
-    return "/";
-  }
+  if (!pathname || !pathname.startsWith("/") || pathname.startsWith("//")) return "/";
   return pathname;
 }
 
@@ -13,10 +10,8 @@ export async function middleware(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // ✅ Skip Supabase setup if no env vars (useful for local builds)
   if (!supabaseUrl || !supabaseAnonKey) return NextResponse.next();
 
-  // ✅ Prepare NextResponse so Supabase can set cookies properly
   let res = NextResponse.next({ request: { headers: req.headers } });
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -34,86 +29,86 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
-  // ✅ Define route types
+  const isAdminArea = pathname.startsWith("/admin");
   const isProtected =
     pathname.startsWith("/admin") ||
     pathname.startsWith("/vendors-chat") ||
     pathname.startsWith("/dashboard");
 
-  const isLoginPage =
-    pathname === "/admin/login" || pathname === "/login";
+  const isAdminLogin = pathname === "/admin/login";
+  const isPublicLogin = pathname === "/public/login";
+  const isForgotPassword = pathname === "/public/forgot-password";
 
-  // ✅ Skip middleware on public routes
-  if (!isProtected) return res;
+  const isSignup =
+    pathname === "/signup" ||
+    pathname.startsWith("/signup/") ||
+    pathname === "/register";
 
-  // ✅ Get user session
+  const isAuthPage = isAdminLogin || isPublicLogin || isForgotPassword || isSignup;
+
+  const loginPath = isAdminArea ? "/admin/login" : "/public/login";
+
   const {
     data: { user },
-    error,
   } = await supabase.auth.getUser();
 
-  // ✅ Silent session refresh (if token expired)
-  if (!user && error?.message?.includes("Invalid Refresh Token")) {
-    console.warn("Refreshing Supabase session silently...");
-    await supabase.auth.refreshSession();
-  }
-
-  // ✅ Redirect unauthenticated users
-  if (!user && !isLoginPage) {
+  if (!user && isProtected) {
     const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/admin/login";
+    loginUrl.pathname = loginPath;
     loginUrl.searchParams.set("next", safeNextParam(pathname));
     return NextResponse.redirect(loginUrl);
   }
 
-  // ✅ Allow login page if not authenticated
-  if (!user && isLoginPage) return res;
-
-  // ✅ Fetch user profile for onboarding logic
-  let profile = null;
-  if (user) {
-    try {
-      const { data, error: profileError } = await supabase
-        .from("profiles")
-        .select("onboarding_completed")
-        .eq("id", user.id)
-        .single();
-
-      if (!profileError) profile = data;
-    } catch (err) {
-      console.error("Middleware profile fetch failed:", err);
-    }
+  if (user && isAuthPage) {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = isAdminArea ? "/admin/dashboard" : "/vision";
+    return NextResponse.redirect(redirectUrl);
   }
 
-  // ✅ Enforce onboarding for authenticated users
-  if (user && profile && !profile.onboarding_completed) {
-    // Prevent infinite loop
-    if (!pathname.startsWith("/admin/onboarding")) {
-      const onboardingUrl = req.nextUrl.clone();
-      onboardingUrl.pathname = "/admin/onboarding/identity-manifest";
-      return NextResponse.redirect(onboardingUrl);
-    }
+  if (!user) return res;
+
+  let profile: any = null;
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("onboarding_completed, role")
+      .eq("id", user.id)
+      .single();
+
+    profile = data;
+  } catch {
+    profile = null;
   }
 
-  // ✅ Smart Redirect: Fully onboarded users skip login & onboarding
-  if (user && profile?.onboarding_completed) {
-    if (isLoginPage || pathname.startsWith("/admin/onboarding")) {
-      const dashboardUrl = req.nextUrl.clone();
-      dashboardUrl.pathname = "/admin/dashboard/overview";
-      return NextResponse.redirect(dashboardUrl);
+  const onboardingCompleted = Boolean(profile?.onboarding_completed);
+
+  if (!onboardingCompleted) {
+    if (isAdminArea) {
+      if (!pathname.startsWith("/admin/dashboard/vendors/onboarding")) {
+        const onboardingUrl = req.nextUrl.clone();
+        onboardingUrl.pathname = "/admin/dashboard/vendors/onboarding";
+        return NextResponse.redirect(onboardingUrl);
+      }
+    } else {
+      if (!pathname.startsWith("/onboarding")) {
+        const onboardingUrl = req.nextUrl.clone();
+        onboardingUrl.pathname = "/onboarding";
+        return NextResponse.redirect(onboardingUrl);
+      }
     }
   }
 
   return res;
 }
 
-// ✅ Match only key protected routes
 export const config = {
   matcher: [
     "/admin/:path*",
     "/vendors-chat/:path*",
     "/dashboard/:path*",
-    "/login",
-    "/admin/login",
+    "/public/login",
+    "/public/forgot-password",
+    "/signup/:path*",
+    "/register",
   ],
 };

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import PublicHeader from "./PublicHeader";
+
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (

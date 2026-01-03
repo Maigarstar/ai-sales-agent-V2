@@ -14,28 +14,31 @@ export default function AuthNav({
 }) {
   const router = useRouter();
 
+  const onBack = () => {
+    try {
+      if (typeof window !== "undefined" && window.history.length > 1) {
+        router.back();
+        return;
+      }
+      router.push(backHref);
+    } catch {
+      router.push(backHref);
+    }
+  };
+
   return (
     <div style={wrap}>
-      <div style={left}>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          style={backBtn}
-          aria-label="Back"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
+      <button type="button" onClick={onBack} style={pillBtn} aria-label="Back">
+        <ArrowLeft size={16} />
+        <span style={label}>Back</span>
+      </button>
 
-        <Link href={backHref} style={ghostLink}>
-          {showHome ? (
-            <>
-              <Home size={16} />
-              Home
-            </>
-          ) : null}
+      {showHome ? (
+        <Link href={backHref} style={pillLink} aria-label="Home">
+          <Home size={16} />
+          <span style={label}>Home</span>
         </Link>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -43,35 +46,37 @@ export default function AuthNav({
 const wrap = {
   display: "flex",
   alignItems: "center",
-  justifyContent: "space-between",
-  marginBottom: 18,
+  gap: 12,
 } as const;
 
-const left = { display: "flex", alignItems: "center", gap: 12 } as const;
-
-const backBtn = {
+const sharedPill = {
   display: "inline-flex",
   alignItems: "center",
-  gap: 8,
-  border: "1px solid var(--border)",
-  background: "transparent",
-  color: "var(--pageText)",
-  padding: "10px 12px",
-  borderRadius: 12,
-  fontSize: 12,
-  fontWeight: 800,
+  gap: 10,
+  padding: "12px 16px",
+  borderRadius: 18,
+  border: "1px solid rgba(0,0,0,0.10)",
+  background: "rgba(255,255,255,0.86)",
+  color: "var(--pageText, #121212)",
+  fontFamily: "var(--font-nunito)",
+  fontSize: 13,
+  fontWeight: 500,
+  letterSpacing: "0.01em",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+} as const;
+
+const pillBtn = {
+  ...sharedPill,
   cursor: "pointer",
 } as const;
 
-const ghostLink = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
+const pillLink = {
+  ...sharedPill,
   textDecoration: "none",
-  border: "1px solid var(--border)",
-  color: "var(--pageText)",
-  padding: "10px 12px",
-  borderRadius: 12,
-  fontSize: 12,
-  fontWeight: 800,
+} as const;
+
+const label = {
+  fontWeight: 500,
 } as const;

@@ -1,21 +1,61 @@
+/* src/app/globals.css */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Public nav tokens, Turbopack safe */
+:root {
+  --pubNavBg: #ffffff;
+  --pubText: #121212;
+  --pubMuted: rgba(0, 0, 0, 0.65);
+  --pubBorder: rgba(0, 0, 0, 0.08);
+  --pubGreen: #183f34;
+  --pubCtaText: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pubNavBg: rgba(255, 255, 255, 0.04);
+    --pubText: rgba(242, 242, 242, 0.92);
+    --pubMuted: rgba(242, 242, 242, 0.70);
+    --pubBorder: rgba(242, 242, 242, 0.14);
+    --pubGreen: #f2f2f2;
+    --pubCtaText: #070707;
+  }
+}
+
 :root {
   --bg-main: #0E100F;
-  --text-primary: #F5F5F7;      
-  --text-h1: #FFFFFF;           
-  --brand-gold: #C5A059;        
-  --brand-green: #183F34;       
-  --brand-grey: #666666;        
+  --text-primary: #F5F5F7;
+  --text-h1: #FFFFFF;
+  --brand-gold: #C5A059;
+  --brand-green: #183F34;
+  --brand-grey: #666666;
   --scrollbar-thumb: #222;
 }
 
+/* Public header tokens (no styled jsx, Turbopack safe) */
+:root {
+  --pubBg: #ffffff;
+  --pubText: #121212;
+  --pubBorder: rgba(0, 0, 0, 0.08);
+  --pubGreen: #183f34;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pubBg: rgba(255, 255, 255, 0.04);
+    --pubText: rgba(242, 242, 242, 0.9);
+    --pubBorder: rgba(242, 242, 242, 0.14);
+    --pubGreen: #f2f2f2;
+  }
+}
+
 .light-mode {
-  --bg-main: #F9F9F7;           
-  --text-primary: #1A1A1A;      /* Deep black for readability */
-  --text-h1: #666666;           /* H1 turns Grey when lights are on */
+  --bg-main: #F9F9F7;
+  --text-primary: #1A1A1A;
+  --text-h1: #666666;
   --scrollbar-thumb: #CCC;
 }
 
@@ -27,7 +67,7 @@ body {
 
 .luxury-serif {
   font-family: 'Gilda Display', serif;
-  letter-spacing: -0.05em !important; 
+  letter-spacing: -0.05em !important;
   line-height: 1.1;
 }
 
@@ -114,4 +154,32 @@ body {
 
 .animate-aura-pulse {
   animation: aura-pulse 2s ease-in-out infinite;
+}
+
+/* ============================= */
+/* AUTH PAGES, HARD ISOLATION    */
+/* ============================= */
+
+.auth-page {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* If any layout ever injects header or nav inside the auth page, hide it */
+.auth-page header,
+.auth-page nav {
+  display: none !important;
+}
+
+/* Keep inputs readable in both modes */
+.auth-left input {
+  color: var(--text-primary);
+}
+
+.auth-left input::placeholder {
+  color: rgba(255,255,255,0.55);
+}
+
+.light-mode .auth-left input::placeholder {
+  color: rgba(0,0,0,0.45);
 }

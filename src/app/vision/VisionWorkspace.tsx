@@ -48,6 +48,33 @@ const MAX_RECENTS = 4;
 
 const BRAND_GOLD = "#c6a157";
 
+/* Subtle product label */
+const PRODUCT_LABEL = "Taigenic.ai";
+const PRODUCT_VERSION = "v1.01";
+
+/* Auth gate cooldown */
+const GATE_DISMISS_KEY = "taigenic_vision_gate_dismissed_at";
+const GATE_COOLDOWN_MS = 1000 * 60 * 30;
+
+function gateDismissedRecently() {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(GATE_DISMISS_KEY);
+    const ts = raw ? Number(raw) : 0;
+    if (!ts) return false;
+    return Date.now() - ts < GATE_COOLDOWN_MS;
+  } catch {
+    return false;
+  }
+}
+
+function setGateDismissedNow() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(GATE_DISMISS_KEY, String(Date.now()));
+  } catch {}
+}
+
 function uid(prefix = "m") {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 }
@@ -129,6 +156,10 @@ export default function VisionWorkspace() {
     return isLightMode ? "#5a5a5a" : "rgba(255,255,255,0.70)";
   }, [isLightMode]);
 
+  const dividerColor = useMemo(() => {
+    return isLightMode ? "rgba(0,0,0,0.12)" : `${BRAND_GOLD}55`;
+  }, [isLightMode]);
+
   const currentThread = useMemo(() => {
     return threads.find((t) => t.id === activeThreadId) || null;
   }, [threads, activeThreadId]);
@@ -140,7 +171,7 @@ export default function VisionWorkspace() {
   }, [messages]);
 
   const showRegisterNudge = useMemo(() => {
-    return !isAuthed && userTurns >= 2;
+    return !isAuthed && userTurns >= 2 && !gateDismissedRecently();
   }, [isAuthed, userTurns]);
 
   // 4 curated images each
@@ -386,8 +417,8 @@ export default function VisionWorkspace() {
     if (!input.trim() || loading) return;
     if (!currentThread) return;
 
-    // Gate on the 4th user prompt
-    if (!isAuthed && userTurns >= 3) {
+    // Gate on the 4th user prompt, with cooldown after dismiss
+    if (!isAuthed && userTurns >= 3 && !gateDismissedRecently()) {
       openAuthGate();
       return;
     }
@@ -401,7 +432,6 @@ export default function VisionWorkspace() {
     setThreadMessages(currentThread.id, next);
     setLoading(true);
 
-    // Optional: if user just hit the 3rd prompt, show a gentle nudge in UI only
     try {
       const res = await fetch("/api/vision", {
         method: "POST",
@@ -523,7 +553,10 @@ export default function VisionWorkspace() {
               </p>
 
               {voiceError && (
-                <p className="text-[12px] mb-6" style={{ color: isLightMode ? "#8a2a2a" : "#ffb3b3" }}>
+                <p
+                  className="text-[12px] mb-6"
+                  style={{ color: isLightMode ? "#8a2a2a" : "#ffb3b3" }}
+                >
                   {voiceError}
                 </p>
               )}
@@ -534,7 +567,9 @@ export default function VisionWorkspace() {
                   className="flex-1 py-3 rounded-full text-[11px] font-semibold tracking-[0.18em] uppercase border transition-all"
                   style={{
                     fontFamily: "var(--font-nunito)",
-                    borderColor: isLightMode ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.14)",
+                    borderColor: isLightMode
+                      ? "rgba(0,0,0,0.25)"
+                      : "rgba(255,255,255,0.14)",
                     background: isListening
                       ? isLightMode
                         ? "rgba(0,0,0,0.06)"
@@ -583,20 +618,23 @@ export default function VisionWorkspace() {
               }}
             >
               <button
-                onClick={() => setShowAuthGate(false)}
+                onClick={() => {
+                  setGateDismissedNow();
+                  setShowAuthGate(false);
+                }}
                 className="absolute top-6 right-6 opacity-50 hover:opacity-100"
               >
                 <X size={18} style={{ color: iconColor }} />
               </button>
 
-              <h3
-                className="text-[22px] mb-3"
-                style={{ fontFamily: "var(--font-gilda)" }}
-              >
+              <h3 className="text-[22px] mb-3" style={{ fontFamily: "var(--font-gilda)" }}>
                 Continue with an account
               </h3>
 
-              <p className={`text-[13px] mb-8 ${theme.subtle}`} style={{ fontFamily: "var(--font-nunito)" }}>
+              <p
+                className={`text-[13px] mb-8 ${theme.subtle}`}
+                style={{ fontFamily: "var(--font-nunito)" }}
+              >
                 Save conversations, keep your history, and unlock the full concierge experience.
               </p>
 
@@ -647,7 +685,10 @@ export default function VisionWorkspace() {
                 </a>
               </div>
 
-              <p className={`mt-8 text-[11px] ${theme.subtle}`} style={{ fontFamily: "var(--font-nunito)" }}>
+              <p
+                className={`mt-8 text-[11px] ${theme.subtle}`}
+                style={{ fontFamily: "var(--font-nunito)" }}
+              >
                 No data is shared. Your details remain private within our platform.
               </p>
             </div>
@@ -663,7 +704,10 @@ export default function VisionWorkspace() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[205] flex items-center justify-center bg-black/60 backdrop-blur-md p-6"
-            onClick={() => setShowRegisterChooser(false)}
+            onClick={() => {
+              setGateDismissedNow();
+              setShowRegisterChooser(false);
+            }}
           >
             <div
               onClick={(e) => e.stopPropagation()}
@@ -673,10 +717,7 @@ export default function VisionWorkspace() {
                 borderColor: isLightMode ? "rgba(0,0,0,0.15)" : `${BRAND_GOLD}33`,
               }}
             >
-              <h4
-                className="text-[18px] mb-4"
-                style={{ fontFamily: "var(--font-gilda)" }}
-              >
+              <h4 className="text-[18px] mb-4" style={{ fontFamily: "var(--font-gilda)" }}>
                 Register
               </h4>
               <div className="grid gap-3">
@@ -723,7 +764,10 @@ export default function VisionWorkspace() {
                 </a>
               </div>
 
-              <p className={`mt-6 text-[11px] ${theme.subtle}`} style={{ fontFamily: "var(--font-nunito)" }}>
+              <p
+                className={`mt-6 text-[11px] ${theme.subtle}`}
+                style={{ fontFamily: "var(--font-nunito)" }}
+              >
                 No data is shared. Your details remain private within our platform.
               </p>
             </div>
@@ -733,7 +777,10 @@ export default function VisionWorkspace() {
 
       {/* SIDEBAR */}
       <motion.aside
-        animate={{ width: isSidebarOpen ? 300 : 0, x: mobileSidebar && !isSidebarOpen ? -40 : 0 }}
+        animate={{
+          width: isSidebarOpen ? 300 : 0,
+          x: mobileSidebar && !isSidebarOpen ? -40 : 0,
+        }}
         transition={{ type: "spring", stiffness: 260, damping: 30 }}
         className={`h-full border-r ${theme.border} ${theme.sidebar} flex flex-col relative shrink-0 overflow-hidden z-[100] ${
           mobileSidebar ? "fixed left-0 top-0 bottom-0" : ""
@@ -745,7 +792,9 @@ export default function VisionWorkspace() {
             <div className="flex items-center gap-4">
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center border"
-                style={{ borderColor: isLightMode ? "rgba(0,0,0,0.18)" : `${BRAND_GOLD}33` }}
+                style={{
+                  borderColor: isLightMode ? "rgba(0,0,0,0.18)" : `${BRAND_GOLD}33`,
+                }}
               >
                 <Sparkles size={14} style={{ color: iconColor }} />
               </div>
@@ -758,10 +807,7 @@ export default function VisionWorkspace() {
             </div>
 
             {mobileSidebar && (
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className="opacity-70 hover:opacity-100"
-              >
+              <button onClick={() => setIsSidebarOpen(false)} className="opacity-70 hover:opacity-100">
                 <X size={18} style={{ color: iconColor }} />
               </button>
             )}
@@ -807,10 +853,7 @@ export default function VisionWorkspace() {
                         : "transparent",
                     }}
                   >
-                    <div
-                      className="text-[12px] font-semibold truncate"
-                      style={{ fontFamily: "var(--font-nunito)" }}
-                    >
+                    <div className="text-[12px] font-semibold truncate" style={{ fontFamily: "var(--font-nunito)" }}>
                       {t.title || (t.chatType === "business" ? "For Vendors" : "For Couples")}
                     </div>
                     <div className="text-[11px] opacity-60 mt-1" style={{ fontFamily: "var(--font-nunito)" }}>
@@ -852,92 +895,131 @@ export default function VisionWorkspace() {
 
       {/* MAIN */}
       <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* TOP NAV */}
-        <nav className="w-full px-6 md:px-12 py-8 flex justify-between items-center shrink-0 z-50">
-          <div className="flex items-center gap-4 flex-1">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} aria-label="Toggle sidebar">
-              <Menu size={22} style={{ color: iconColor }} />
-            </button>
+        {/* TOP MENU, DIVIDER, BRANDING (fix for overlap) */}
+        <header className="w-full shrink-0 z-50">
+          {/* Top menu bar */}
+          <div className="w-full px-6 md:px-12 pt-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <button
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  aria-label="Toggle sidebar"
+                  className="shrink-0"
+                >
+                  <Menu size={22} style={{ color: iconColor }} />
+                </button>
+
+                <div className="min-w-0">
+                  <div
+                    className="text-[10px] uppercase tracking-[0.45em] truncate"
+                    style={{
+                      fontFamily: "var(--font-nunito)",
+                      color: isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
+                    }}
+                    title={`${PRODUCT_LABEL} · ${PRODUCT_VERSION}`}
+                  >
+                    {PRODUCT_LABEL} <span style={{ opacity: 0.75 }}>· {PRODUCT_VERSION}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-5 justify-end">
+                <button
+                  onClick={() => setIsProjectionOpen(!isProjectionOpen)}
+                  aria-label="Toggle projection"
+                  className="hidden md:inline-flex"
+                >
+                  {isProjectionOpen ? (
+                    <PanelRightClose size={22} style={{ color: iconColor }} />
+                  ) : (
+                    <PanelRightOpen size={22} style={{ color: iconColor }} />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setIsLightMode(!isLightMode)}
+                  aria-label="Toggle theme"
+                  className="opacity-90 hover:opacity-100"
+                >
+                  {isLightMode ? (
+                    <Moon size={18} style={{ color: iconColor }} />
+                  ) : (
+                    <Sun size={18} style={{ color: iconColor }} />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setShowRegisterChooser(true)}
+                  className="hidden md:inline-flex px-5 py-2 rounded-full border text-[11px] font-semibold uppercase tracking-[0.18em]"
+                  style={{
+                    fontFamily: "var(--font-nunito)",
+                    borderColor: isLightMode ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.14)",
+                    color: isLightMode ? "#111111" : "white",
+                  }}
+                >
+                  Register
+                </button>
+
+                <a
+                  href="/login"
+                  className="hidden md:inline-flex px-5 py-2 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em]"
+                  style={{
+                    fontFamily: "var(--font-nunito)",
+                    background: isLightMode ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)",
+                    color: isLightMode ? "#111111" : "white",
+                  }}
+                >
+                  Log in
+                </a>
+
+                <button
+                  className="w-10 h-10 rounded-full border flex items-center justify-center opacity-70 shrink-0"
+                  style={{
+                    borderColor: isLightMode ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.12)",
+                  }}
+                  aria-label="Profile"
+                >
+                  <User size={18} style={{ color: iconColor }} />
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="text-center absolute left-1/2 -translate-x-1/2 pointer-events-none">
-            <h1
-              className="text-[22px] md:text-[34px] uppercase leading-none tracking-tight"
-              style={{
-                fontFamily: "var(--font-gilda)",
-                color: isLightMode ? "#111111" : "white",
-              }}
-            >
-              5 STAR WEDDINGS
-            </h1>
-            <h2
-              className="text-[9px] md:text-[11px] uppercase tracking-[0.55em] mt-1"
-              style={{ fontFamily: "var(--font-gilda)", color: BRAND_GOLD }}
-            >
-              THE CONCIERGE
-            </h2>
+          {/* Divider line */}
+          <div className="w-full px-6 md:px-12 mt-5">
+            <div style={{ height: 1, width: "100%", background: dividerColor }} />
           </div>
 
-          <div className="flex items-center gap-5 flex-1 justify-end">
-            <button
-              onClick={() => setIsProjectionOpen(!isProjectionOpen)}
-              aria-label="Toggle projection"
-              className="hidden md:inline-flex"
-            >
-              {isProjectionOpen ? (
-                <PanelRightClose size={22} style={{ color: iconColor }} />
-              ) : (
-                <PanelRightOpen size={22} style={{ color: iconColor }} />
-              )}
-            </button>
-
-            <button
-              onClick={() => setIsLightMode(!isLightMode)}
-              aria-label="Toggle theme"
-              className="opacity-90 hover:opacity-100"
-            >
-              {isLightMode ? <Moon size={18} style={{ color: iconColor }} /> : <Sun size={18} style={{ color: iconColor }} />}
-            </button>
-
-            <button
-              onClick={() => setShowRegisterChooser(true)}
-              className="hidden md:inline-flex px-5 py-2 rounded-full border text-[11px] font-semibold uppercase tracking-[0.18em]"
-              style={{
-                fontFamily: "var(--font-nunito)",
-                borderColor: isLightMode ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.14)",
-                color: isLightMode ? "#111111" : "white",
-              }}
-            >
-              Register
-            </button>
-
-            <a
-              href="/login"
-              className="hidden md:inline-flex px-5 py-2 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em]"
-              style={{
-                fontFamily: "var(--font-nunito)",
-                background: isLightMode ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)",
-                color: isLightMode ? "#111111" : "white",
-              }}
-            >
-              Log in
-            </a>
-
-            <button
-              className="w-10 h-10 rounded-full border flex items-center justify-center opacity-70"
-              style={{ borderColor: isLightMode ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.12)" }}
-              aria-label="Profile"
-            >
-              <User size={18} style={{ color: iconColor }} />
-            </button>
+          {/* Branding row, now separated so it never clashes with menu */}
+          <div className="w-full px-6 md:px-12 pt-7 pb-7">
+            <div className="text-center">
+              <h1
+                className="text-[22px] md:text-[34px] uppercase leading-none tracking-tight"
+                style={{
+                  fontFamily: "var(--font-gilda)",
+                  color: isLightMode ? "#111111" : "white",
+                }}
+              >
+                5 STAR WEDDINGS
+              </h1>
+              <h2
+                className="text-[9px] md:text-[11px] uppercase tracking-[0.55em] mt-1"
+                style={{ fontFamily: "var(--font-gilda)", color: BRAND_GOLD }}
+              >
+                THE CONCIERGE
+              </h2>
+            </div>
           </div>
-        </nav>
+        </header>
 
         <div className="flex-1 flex overflow-hidden">
           {/* CHAT */}
-          <main ref={scrollRef} className="flex-1 overflow-y-auto px-6 md:px-12 py-4 border-r border-white/0">
+          <main
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto px-6 md:px-12 py-4 border-r border-white/0"
+          >
             <div className="max-w-3xl mx-auto space-y-8 pb-[220px] pt-6">
-              {/* Persona switcher (15% bigger) */}
+              {/* Persona switcher */}
               <div className="flex justify-center mb-10">
                 <div
                   className={`flex p-1 rounded-full border backdrop-blur-md w-full max-w-md shadow-xl`}
@@ -953,7 +1035,12 @@ export default function VisionWorkspace() {
                       fontFamily: "var(--font-nunito)",
                       letterSpacing: "0.18em",
                       background: chatType === "business" ? BRAND_GOLD : "transparent",
-                      color: chatType === "business" ? "#111111" : isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
+                      color:
+                        chatType === "business"
+                          ? "#111111"
+                          : isLightMode
+                          ? "rgba(0,0,0,0.55)"
+                          : "rgba(255,255,255,0.55)",
                     }}
                   >
                     For Vendors
@@ -965,7 +1052,12 @@ export default function VisionWorkspace() {
                       fontFamily: "var(--font-nunito)",
                       letterSpacing: "0.18em",
                       background: chatType === "couple" ? "rgba(24,63,52,0.95)" : "transparent",
-                      color: chatType === "couple" ? "white" : isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
+                      color:
+                        chatType === "couple"
+                          ? "white"
+                          : isLightMode
+                          ? "rgba(0,0,0,0.55)"
+                          : "rgba(255,255,255,0.55)",
                     }}
                   >
                     For Couples
@@ -982,7 +1074,9 @@ export default function VisionWorkspace() {
                     ? "rgba(0,0,0,0.03)"
                     : "rgba(255,255,255,0.04)";
 
-                  const bubbleBorder = isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)";
+                  const bubbleBorder = isLightMode
+                    ? "rgba(0,0,0,0.10)"
+                    : "rgba(255,255,255,0.10)";
 
                   return (
                     <motion.div
@@ -1020,7 +1114,6 @@ export default function VisionWorkspace() {
                           {m.content}
                         </div>
 
-                        {/* Actions under assistant only */}
                         {!isUser && (
                           <div className="mt-3 flex items-center gap-4">
                             <button
@@ -1082,7 +1175,6 @@ export default function VisionWorkspace() {
                 })}
               </AnimatePresence>
 
-              {/* Typing indicator while loading */}
               <AnimatePresence>
                 {loading && (
                   <motion.div
@@ -1138,7 +1230,10 @@ export default function VisionWorkspace() {
               >
                 <h3
                   className="text-[10px] font-semibold uppercase tracking-[0.5em] opacity-60 px-2"
-                  style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#6b6b6b" : "rgba(255,255,255,0.55)" }}
+                  style={{
+                    fontFamily: "var(--font-nunito)",
+                    color: isLightMode ? "#6b6b6b" : "rgba(255,255,255,0.55)",
+                  }}
                 >
                   Projection Canvas
                 </h3>
@@ -1162,10 +1257,17 @@ export default function VisionWorkspace() {
                           const el = e.currentTarget;
                           el.style.display = "none";
                           const parent = el.parentElement;
-                          if (parent) parent.style.background = isLightMode ? "linear-gradient(180deg,#f2f2f2,#e6e6e6)" : "linear-gradient(180deg,#111,#0b0b0b)";
+                          if (parent) {
+                            parent.style.background = isLightMode
+                              ? "linear-gradient(180deg,#f2f2f2,#e6e6e6)"
+                              : "linear-gradient(180deg,#111,#0b0b0b)";
+                          }
                         }}
                       />
-                      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)" }} />
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{ background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)" }}
+                      />
                     </motion.div>
                   ))}
                 </div>
@@ -1198,7 +1300,6 @@ export default function VisionWorkspace() {
               </div>
             )}
 
-            {/* Chat input: thinner, centered, dark grey outline on light mode */}
             <div
               className="rounded-[34px] border flex items-center gap-4 px-5 py-3 shadow-sm"
               style={{

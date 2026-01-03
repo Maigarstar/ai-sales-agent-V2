@@ -1,0 +1,19 @@
+:root {
+  --pubNavBg: #ffffff;
+  --pubText: #121212;
+  --pubMuted: rgba(0, 0, 0, 0.65);
+  --pubBorder: rgba(0, 0, 0, 0.08);
+  --pubGreen: #183f34;
+  --pubCtaText: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pubNavBg: rgba(255, 255, 255, 0.04);
+    --pubText: rgba(242, 242, 242, 0.92);
+    --pubMuted: rgba(242, 242, 242, 0.70);
+    --pubBorder: rgba(242, 242, 242, 0.14);
+    --pubGreen: #f2f2f2;
+    --pubCtaText: #070707;
+  }
+}

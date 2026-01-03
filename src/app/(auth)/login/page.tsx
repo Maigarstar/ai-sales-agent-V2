@@ -1,29 +1,31 @@
+// src/app/login/page.tsx
 "use client";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
 import { Mail, Lock } from "lucide-react";
+import { createBrowserSupabase } from "@/lib/supabase/browser";
 
 const GOLD = "#c6a157";
 
-function safeNext(next: string | null) {
-  if (!next) return "/vision";
-  if (!next.startsWith("/")) return "/vision";
-  if (next.startsWith("//")) return "/vision";
-  return next;
+function safeNextParam(p: string | null) {
+  if (!p) return "";
+  if (!p.startsWith("/")) return "";
+  if (p.startsWith("//")) return "";
+  return p;
 }
 
-export default function PublicLoginPage() {
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const supabase = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !anon) return null;
-    return createBrowserClient(url, anon);
+    try {
+      return createBrowserSupabase();
+    } catch {
+      return null;
+    }
   }, []);
 
   const [email, setEmail] = useState("");
@@ -41,13 +43,20 @@ export default function PublicLoginPage() {
       return;
     }
 
-    if (!email.trim()) return setError("Please enter your email.");
-    if (!password) return setError("Please enter your password.");
+    if (!email.trim()) {
+      setError("Please enter your email.");
+      return;
+    }
+
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
 
     setBusy(true);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -57,8 +66,28 @@ export default function PublicLoginPage() {
         return;
       }
 
-      const next = safeNext(searchParams.get("next"));
-      router.push(next);
+      const userId = data?.user?.id;
+
+      let role: string | null = null;
+
+      if (userId) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .single();
+
+        role = profile?.role ?? null;
+      }
+
+      const next = safeNextParam(searchParams.get("next"));
+
+      if (next) {
+        router.push(next);
+      } else {
+        router.push(role === "vendor" || role === "business" ? "/admin/dashboard" : "/vision");
+      }
+
       router.refresh();
     } catch (err: any) {
       setError(err?.message || "Sign in failed.");
@@ -78,7 +107,7 @@ export default function PublicLoginPage() {
 
         <h2 style={title}>Sign in</h2>
         <p style={subtitle}>
-          Continue your conversations, saved matches, and recommendations.
+          Continue with Aura, keep your shortlist, and request introductions to trusted vendors.
         </p>
 
         <form style={form} onSubmit={onSubmit}>
@@ -102,6 +131,10 @@ export default function PublicLoginPage() {
             disabled={busy}
           />
 
+          <div style={privacyNote}>
+            Private by design. No spam, no data selling.
+          </div>
+
           {error ? <div style={errorBox}>{error}</div> : null}
 
           <button type="submit" style={primaryBtn} disabled={busy}>
@@ -109,26 +142,11 @@ export default function PublicLoginPage() {
           </button>
 
           <div style={links}>
-            <Link href="/public/forgot-password" style={link}>
+            <Link href="/forgot-password" style={linkMuted}>
               Forgot your password
             </Link>
-            <Link href="/cookie-preferences" style={linkMuted}>
-              Cookie Preferences
-            </Link>
-          </div>
-
-          <div style={dividerRow}>
-            <div style={dividerLine} />
-            <div style={dividerText}>New here</div>
-            <div style={dividerLine} />
-          </div>
-
-          <div style={ctaRow}>
-            <Link href="/public/signup" style={ctaBtn}>
-              Couples signup
-            </Link>
-            <Link href="/signup/business" style={ctaBtn}>
-              Business signup
+            <Link href="/signup" style={link}>
+              Create an account
             </Link>
           </div>
         </form>
@@ -145,9 +163,9 @@ export default function PublicLoginPage() {
       <div className="authImage" style={right}>
         <div style={imageOverlay}>
           <div style={imageText}>
-            <h3 style={imageTitle}>Your wedding, beautifully guided</h3>
+            <h3 style={imageTitle}>Your vision, saved and ready</h3>
             <p style={imageSubtitle}>
-              One conversation. Exceptional venues. Trusted vendors.
+              Sign in to continue with Aura, keep your shortlist, and request introductions to trusted vendors.
             </p>
           </div>
         </div>
@@ -226,6 +244,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        autoComplete={name === "password" ? "current-password" : "email"}
       />
     </div>
   );
@@ -240,14 +259,14 @@ const wrapper = {
   fontFamily: "'Nunito Sans', sans-serif",
   background: "var(--pageBg)",
   color: "var(--pageText)",
-};
+} as const;
 
 const left = {
   padding: "80px 90px",
   display: "flex",
   flexDirection: "column" as const,
   justifyContent: "center",
-};
+} as const;
 
 const right = {
   backgroundImage:
@@ -255,7 +274,7 @@ const right = {
   backgroundSize: "cover",
   backgroundPosition: "center",
   position: "relative" as const,
-};
+} as const;
 
 const imageOverlay = {
   position: "absolute" as const,
@@ -264,25 +283,25 @@ const imageOverlay = {
   display: "flex",
   alignItems: "flex-end",
   padding: "60px",
-};
+} as const;
 
-const imageText = { color: "#fff", maxWidth: 420 };
+const imageText = { color: "#fff", maxWidth: 420 } as const;
 
 const imageTitle = {
   fontFamily: "'Gilda Display', serif",
   fontSize: 34,
   marginBottom: 12,
-};
+} as const;
 
-const imageSubtitle = { fontSize: 15, opacity: 0.9 };
+const imageSubtitle = { fontSize: 15, opacity: 0.9 } as const;
 
-const brandWrap = { textAlign: "center" as const, marginBottom: 50 };
+const brandWrap = { textAlign: "center" as const, marginBottom: 50 } as const;
 
 const brandTitle = {
   fontFamily: "'Gilda Display', serif",
   fontSize: 44,
   marginBottom: 6,
-};
+} as const;
 
 const brandSub = {
   fontSize: 13,
@@ -290,17 +309,17 @@ const brandSub = {
   fontWeight: 800,
   letterSpacing: "2px",
   textTransform: "uppercase" as const,
-};
+} as const;
 
 const title = {
   fontFamily: "'Gilda Display', serif",
   fontSize: 32,
   marginBottom: 10,
-};
+} as const;
 
-const subtitle = { fontSize: 15, color: "var(--muted)", marginBottom: 36 };
+const subtitle = { fontSize: 15, color: "var(--muted)", marginBottom: 36 } as const;
 
-const form = { display: "flex", flexDirection: "column" as const, gap: 18 };
+const form = { display: "flex", flexDirection: "column" as const, gap: 18 } as const;
 
 const field = {
   display: "flex",
@@ -310,9 +329,9 @@ const field = {
   padding: "14px 16px",
   gap: 10,
   background: "var(--fieldBg)",
-};
+} as const;
 
-const fieldIcon = { color: "var(--icon)" };
+const fieldIcon = { color: "var(--icon)" } as const;
 
 const input = {
   border: "none",
@@ -321,7 +340,15 @@ const input = {
   width: "100%",
   background: "transparent",
   color: "var(--pageText)",
-};
+} as const;
+
+const privacyNote = {
+  marginTop: 2,
+  fontSize: 12,
+  color: "var(--muted)",
+  textAlign: "center" as const,
+  lineHeight: 1.5,
+} as const;
 
 const errorBox = {
   border: "1px solid rgba(210, 60, 60, 0.35)",
@@ -331,10 +358,10 @@ const errorBox = {
   padding: "12px 14px",
   fontSize: 13,
   lineHeight: 1.4,
-};
+} as const;
 
 const primaryBtn = {
-  marginTop: 8,
+  marginTop: 12,
   width: "100%",
   padding: "14px",
   borderRadius: 12,
@@ -347,78 +374,36 @@ const primaryBtn = {
 } as const;
 
 const links = {
-  marginTop: 8,
+  marginTop: 24,
   display: "flex",
   justifyContent: "center",
-  gap: 26,
+  gap: 30,
   flexWrap: "wrap" as const,
-};
+} as const;
 
 const link = {
   fontSize: 13,
   color: "var(--pageText)",
   textDecoration: "none",
   fontWeight: 700,
-};
+} as const;
 
 const linkMuted = {
   fontSize: 13,
   color: "var(--muted2)",
   textDecoration: "none",
-  fontWeight: 700,
-};
-
-const dividerRow = {
-  marginTop: 12,
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-};
-
-const dividerLine = {
-  flex: 1,
-  height: 1,
-  background: "var(--border)",
-  opacity: 0.7,
-};
-
-const dividerText = {
-  fontSize: 12,
-  color: "var(--muted2)",
-  fontWeight: 800,
-  letterSpacing: "1px",
-  textTransform: "uppercase" as const,
-};
-
-const ctaRow = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 12,
-  marginTop: 6,
-};
-
-const ctaBtn = {
-  textAlign: "center" as const,
-  padding: "12px 14px",
-  borderRadius: 12,
-  border: "1px solid var(--border)",
-  textDecoration: "none",
-  color: "var(--pageText)",
-  fontWeight: 800,
-  fontSize: 14,
-  background: "transparent",
-};
+} as const;
 
 const footer = {
   marginTop: 60,
   fontSize: 11,
   color: "var(--muted2)",
   textAlign: "center" as const,
-};
+} as const;
 
 const cookieLink = {
   color: "var(--pageText)",
   textDecoration: "none",
   fontSize: 11,
   fontWeight: 700,
-};
+} as const;

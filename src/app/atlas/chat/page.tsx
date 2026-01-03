@@ -19,7 +19,7 @@ export default function ProductionPlatinumConcierge() {
   const [isListening, setIsListening] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Good evening. I am Aura. How may I assist in curating your vision today?" }
+    { role: "assistant", content: "Hi, I am Atlas. Do you have a wedding business?" }
   ]);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);

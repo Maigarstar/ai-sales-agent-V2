@@ -1,3 +1,4 @@
+// src/lib/atlas/saveAtlasVendorLead.ts
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -6,7 +7,9 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-type AtlasVendorLeadInput = {
+export type AtlasLeadPriority = "HOT" | "WARM" | "COLD";
+
+export type AtlasVendorLeadInput = {
   business_name?: string;
   category?: string;
   location?: string;
@@ -22,11 +25,12 @@ type AtlasVendorLeadInput = {
   website?: string;
   stage?: string;
   score?: number;
+
+  // added to match route.ts usage
+  priority?: AtlasLeadPriority;
 };
 
-export async function saveAtlasVendorLead(
-  data: AtlasVendorLeadInput
-) {
+export async function saveAtlasVendorLead(data: AtlasVendorLeadInput) {
   if (!data.contact_email) return null;
 
   const { data: result, error } = await supabase

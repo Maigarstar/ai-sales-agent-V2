@@ -390,5 +390,5 @@ export default function VendorsChatClient() {
         </div>
       </div>
     </div>
-  );
+  ); 
 }

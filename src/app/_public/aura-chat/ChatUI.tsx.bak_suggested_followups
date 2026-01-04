@@ -69,7 +69,7 @@ const VENDOR_PROMPTS = [
 /* =========================================================
    Types
 ========================================================= */
-type ChatMessage = { role: "user" | "assistant"; content: string; suggestions?: string[] };
+type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type Intent = "couple" | "vendor" | "unknown";
 
@@ -169,41 +169,6 @@ function detectIntent(text: string): Intent {
   if (coupleHit && !vendorHit) return "couple";
   return "unknown";
 }
-
-/* FOLLOWUPS_BEGIN */
-function buildFollowUps(reply: string, intent: Intent): string[] {
-  const r = String(reply || "").toLowerCase();
-
-  const couple = [
-    "Show me 3 venue ideas for this",
-    "Give me a budget split for this",
-    "Create a timeline checklist for this",
-  ];
-
-  const vendor = [
-    "Rewrite my positioning in luxury tone",
-    "Give me 5 SEO fixes to do today",
-    "Create a premium package offer",
-  ];
-
-  const neutral = [
-    "Ask me 3 questions to refine this",
-    "Summarise options in 3 bullets",
-    "What should we decide next",
-  ];
-
-  if (intent === "vendor") return vendor;
-
-  if (intent === "couple") {
-    if (r.includes("budget")) return ["Break down the budget in detail", "What vendors do we book first", "Create a 12 month plan"];
-    if (r.includes("venue") || r.includes("venues")) return ["Compare 3 venues side by side", "What questions should we ask venues", "Suggest the best season for this"];
-    return couple;
-  }
-
-  return neutral;
-}
-/* FOLLOWUPS_END */
-
 
 /* =========================================================
    UUID helper
@@ -863,7 +828,7 @@ export default function VendorsChatInner() {
       const reply = String(data?.reply || "").trim();
 
       if (reply) {
-        const assistantMsg: ChatMessage = { role: "assistant", content: reply, suggestions: buildFollowUps(reply, intent) };
+        const assistantMsg: ChatMessage = { role: "assistant", content: reply };
         setMessages((prev) => clampMessages([...prev, assistantMsg], 80));
       } else {
         setMessages((prev) =>
@@ -926,7 +891,7 @@ export default function VendorsChatInner() {
       const reply = String(data?.reply || "").trim();
 
       if (reply) {
-        setMessages((prev: any) => [...messagesForRun, { role: "assistant", content: reply, suggestions: buildFollowUps(reply, intent) }]);
+        setMessages((prev: any) => [...messagesForRun, { role: "assistant", content: reply }]);
       } else {
         setMessages((prev: any) => [...messagesForRun, { role: "assistant", content: "I’m here. Say that again and I’ll answer properly." }]);
       }
@@ -1425,36 +1390,7 @@ export default function VendorsChatInner() {
                     ) : (
                       <div className="space-y-2">
                         <FormattedMessage content={m.content} />
-                        
-                        {/* FOLLOWUPS_RENDER */}
                         {i === lastAssistantIndex && !loading ? (
-                          (() => {
-                            const sugs = (m as any).suggestions;
-                            const list =
-                              Array.isArray(sugs) && sugs.length
-                                ? sugs
-                                : (typeof buildFollowUps === "function"
-                                    ? buildFollowUps(String((m as any).content || ""), intent)
-                                    : []);
-
-                            return Array.isArray(list) && list.length ? (
-                              <div className="flex flex-wrap gap-2 pt-2">
-                                {list.slice(0, 3).map((s: string, k: number) => (
-                                  <button
-                                    key={k}
-                                    type="button"
-                                    onClick={() => handleSend(s)}
-                                    className="text-xs px-3 py-1.5 rounded-full border border-gray-200 bg-white hover:bg-gray-50"
-                                  >
-                                    {s}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null;
-                          })()
-                        ) : null}
-
-{i === lastAssistantIndex && !loading ? (
                           <div className="flex">
                             <button
                               type="button"

@@ -14,22 +14,22 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
+
 import AuraVoice from "@/app/components/AuraVoice";
 import VoiceToTextButton from "@/app/components/VoiceToTextButton";
 
 /* =========================================================
    Storage keys
-========================================================= */
+   ========================================================= */
 const STORAGE_KEY_COOKIE = "fsw_cookie_consent";
 const STORAGE_KEY_SESSIONS = "fsw_chat_sessions_v3";
 const STORAGE_KEY_CHAT_ACTIVE = "fsw_chat_active_v3";
 const STORAGE_KEY_LEAD = "fsw_lead_v3";
 const STORAGE_KEY_CONV_PREFIX = "fsw_chat_conv_v3_";
-const STORAGE_KEY_ACTIVE_THREAD = "fsw_active_thread_id_v1";
 
 /* =========================================================
    Branding
-========================================================= */
+   ========================================================= */
 const BRAND = "Taigenic";
 const PRODUCT = "Concierge";
 const ASSISTANT = "Aura";
@@ -37,7 +37,7 @@ const DIRECTORY_DOMAIN = "5starweddingdirectory.com";
 
 /* =========================================================
    Opening message
-========================================================= */
+   ========================================================= */
 const OPENING_MESSAGE = `
 Hello, I’m Aura, the concierge for 5 Star Weddings.
 
@@ -49,7 +49,7 @@ Tell me what brings you here today.
 
 /* =========================================================
    Starter chips
-========================================================= */
+   ========================================================= */
 const COUPLE_PROMPTS = [
   "We want Lake Como, around 80 guests",
   "Budget breakdown for 100 guests",
@@ -68,8 +68,8 @@ const VENDOR_PROMPTS = [
 
 /* =========================================================
    Types
-========================================================= */
-type ChatMessage = { role: "user" | "assistant"; content: string; suggestions?: string[] };
+   ========================================================= */
+type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type Intent = "couple" | "vendor" | "unknown";
 
@@ -86,14 +86,6 @@ type SidebarSession = {
   updatedAt: number;
   lastMessage?: string;
   intent?: Intent;
-};
-
-type ThreadRow = {
-  id: string;
-  title?: string | null;
-  chat_type?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
 };
 
 function safeJsonParse<T>(raw: string | null, fallback: T): T {
@@ -170,49 +162,16 @@ function detectIntent(text: string): Intent {
   return "unknown";
 }
 
-/* FOLLOWUPS_BEGIN */
-function buildFollowUps(reply: string, intent: Intent): string[] {
-  const r = String(reply || "").toLowerCase();
-
-  const couple = [
-    "Show me 3 venue ideas for this",
-    "Give me a budget split for this",
-    "Create a timeline checklist for this",
-  ];
-
-  const vendor = [
-    "Rewrite my positioning in luxury tone",
-    "Give me 5 SEO fixes to do today",
-    "Create a premium package offer",
-  ];
-
-  const neutral = [
-    "Ask me 3 questions to refine this",
-    "Summarise options in 3 bullets",
-    "What should we decide next",
-  ];
-
-  if (intent === "vendor") return vendor;
-
-  if (intent === "couple") {
-    if (r.includes("budget")) return ["Break down the budget in detail", "What vendors do we book first", "Create a 12 month plan"];
-    if (r.includes("venue") || r.includes("venues")) return ["Compare 3 venues side by side", "What questions should we ask venues", "Suggest the best season for this"];
-    return couple;
-  }
-
-  return neutral;
-}
-/* FOLLOWUPS_END */
-
-
 /* =========================================================
    UUID helper
-========================================================= */
+   ========================================================= */
 function makeUuid() {
+  // Browser supported in modern Chrome
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
 
+  // Fallback UUID v4, good enough for local and server
   const s: string[] = [];
   const hex = "0123456789abcdef";
   for (let i = 0; i < 36; i++) s[i] = hex[Math.floor(Math.random() * 16)];
@@ -224,7 +183,7 @@ function makeUuid() {
 
 /* =========================================================
    Formatter
-========================================================= */
+   ========================================================= */
 function FormattedMessage({ content }: { content: string }) {
   const cleanContent = content.replace(/\\n/g, "\n");
   const lines = cleanContent.split("\n");
@@ -277,7 +236,7 @@ function FormattedMessage({ content }: { content: string }) {
 
 /* =========================================================
    Lead capture inline card
-========================================================= */
+   ========================================================= */
 function LeadCaptureInline({
   onSubmit,
   onSkip,
@@ -337,7 +296,7 @@ function LeadCaptureInline({
 
 /* =========================================================
    Cookie preferences
-========================================================= */
+   ========================================================= */
 function CookiePreferenceCenter({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -406,7 +365,7 @@ function CookiePreferenceCenter({ isOpen, onClose }: { isOpen: boolean; onClose:
 
 /* =========================================================
    Main component
-========================================================= */
+   ========================================================= */
 export default function VendorsChatInner() {
   const searchParams = useSearchParams();
   const isEmbed = searchParams.get("embed") === "1";
@@ -417,8 +376,6 @@ export default function VendorsChatInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [editingUserIndex, setEditingUserIndex] = useState<number>(-1);
-  const [editDraft, setEditDraft] = useState<string>("");
 
   const [intent, setIntent] = useState<Intent>("unknown");
 
@@ -433,182 +390,8 @@ export default function VendorsChatInner() {
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const [activeThreadId, setActiveThreadId] = useState<string>("");
-
-  /* AUTO_TITLE_SAFE_BEGIN */
-  const titledThreadIdsRef = useRef<Set<string>>(new Set());
-
-  function makeThreadTitleFromText(text: string) {
-    const clean = String(text || "")
-      .replace(/\s+/g, " ")
-      .replace(/[\`"'“”]/g, "")
-      .trim();
-
-    if (!clean) return "Conversation";
-
-    const max = 64;
-    return clean.length <= max ? clean : clean.slice(0, max).trim() + "…";
-  }
-
-  async function maybeAutoTitleThread(threadId: string, firstUserText: string) {
-    const id = String(threadId || "").trim();
-    if (!id) return;
-
-    if (titledThreadIdsRef.current.has(id)) return;
-    titledThreadIdsRef.current.add(id);
-
-    const title = makeThreadTitleFromText(firstUserText);
-
-    try {
-      const res = await fetch(`/api/threads/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-      
-
-        const savedTitle = String(data?.thread?.title || title);
-
-        setThreads((prev: any) =>
-          Array.isArray(prev)
-            ? prev.map((t: any) => (t?.id === id ? { ...t, title: savedTitle } : t))
-            : prev
-        );
-      }
-    } catch {
-      // ignore
-    }
-  }
-  /* AUTO_TITLE_SAFE_END */
-
-  const [serverMode, setServerMode] = useState(false);
-  const [threads, setThreads] = useState<ThreadRow[]>([]);
-  const [threadsLoading, setThreadsLoading] = useState(false);
-  const [bootstrapped, setBootstrapped] = useState(false);
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  async function loadThread(threadId: string) {
-    const id = String(threadId || "").trim();
-    if (!id) return;
-
-    setActiveThreadId(id);
-    try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_THREAD, id);
-    } catch {}
-
-    setConversationId(null);
-    setIntent("unknown");
-    setLeadShownOnce(false);
-
-    try {
-      const mRes = await fetch(`/api/threads/${id}/messages`, { method: "GET" });
-      if (!mRes.ok) {
-        setMessages([{ role: "assistant", content: OPENING_MESSAGE }]);
-        return;
-      }
-
-      const mData = await mRes.json().catch(() => ({}));
-      const msgs = Array.isArray(mData?.messages) ? mData.messages : [];
-
-      if (!msgs.length) {
-        setMessages([{ role: "assistant", content: OPENING_MESSAGE }]);
-        return;
-      }
-
-      setMessages(
-        msgs.map((m: any) => ({
-          role: m?.role === "user" ? "user" : "assistant",
-          content: String(m?.content || ""),
-        }))
-      );
-    } catch {
-      setMessages([{ role: "assistant", content: OPENING_MESSAGE }]);
-    }
-  }
-
-  async function createThread(chatType: "couple" | "business") {
-    try {
-      const res = await fetch("/api/threads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatType,
-          title: "New conversation",
-        }),
-      });
-
-      if (!res.ok) return "";
-      const data = await res.json().catch(() => ({}));
-      const id = String(data?.thread?.id || "").trim();
-      return id;
-    } catch {
-      return "";
-    }
-  }
-
-  async function refreshThreads(preferId?: string) {
-    setThreadsLoading(true);
-    try {
-      const tRes = await fetch("/api/threads", { method: "GET" });
-      if (!tRes.ok) {
-        setServerMode(false);
-        return;
-      }
-
-      const tData = await tRes.json().catch(() => ({}));
-      const list = Array.isArray(tData?.threads) ? (tData.threads as ThreadRow[]) : [];
-      setThreads(list);
-      setServerMode(true);
-
-      let wanted = String(preferId || "").trim();
-      if (!wanted) {
-        try {
-          wanted = String(localStorage.getItem(STORAGE_KEY_ACTIVE_THREAD) || "").trim();
-        } catch {
-          wanted = "";
-        }
-      }
-
-      const hasWanted = wanted && list.some((t) => t?.id === wanted);
-      const first = String(list?.[0]?.id || "").trim();
-
-      if (hasWanted) {
-        await loadThread(wanted);
-        return;
-      }
-
-      if (first) {
-        await loadThread(first);
-        return;
-      }
-
-      const newId = await createThread("couple");
-      if (newId) {
-        await refreshThreads(newId);
-      }
-    } finally {
-      setThreadsLoading(false);
-    }
-  }
-
-
-  
-  /* Bootstrap, prefer server threads, else fall back to local storage */
-  useEffect(() => {
-    (async () => {
-      try {
-        await refreshThreads();
-      } finally {
-        setBootstrapped(true);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   /* Restore lead */
   useEffect(() => {
@@ -616,19 +399,14 @@ export default function VendorsChatInner() {
     if (l?.email) setLead(l);
   }, []);
 
-  /* Restore sessions, only used when server threads are not available */
+  /* Restore sessions */
   useEffect(() => {
-    if (!bootstrapped) return;
-    if (serverMode) return;
     const all = safeJsonParse<SidebarSession[]>(localStorage.getItem(STORAGE_KEY_SESSIONS), []);
     setSessions(all.sort((a, b) => b.updatedAt - a.updatedAt));
-  }, [bootstrapped, serverMode]);
+  }, []);
 
-  /* Restore active local chat, only when server threads are not available */
+  /* Restore active chat */
   useEffect(() => {
-    if (!bootstrapped) return;
-    if (serverMode) return;
-
     const saved = safeJsonParse<any>(localStorage.getItem(STORAGE_KEY_CHAT_ACTIVE), null);
     if (saved?.conversationId && Array.isArray(saved?.messages)) {
       setConversationId(saved.conversationId);
@@ -640,7 +418,7 @@ export default function VendorsChatInner() {
     setConversationId(null);
     setMessages([{ role: "assistant", content: OPENING_MESSAGE }]);
     setIntent("unknown");
-  }, [bootstrapped, serverMode]);
+  }, []);
 
   /* Cookie prompt */
   useEffect(() => {
@@ -661,9 +439,8 @@ export default function VendorsChatInner() {
     textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
   }, [input]);
 
-  /* Persist active chat, local storage only when not in server mode */
+  /* Persist active chat */
   useEffect(() => {
-    if (serverMode) return;
     if (!conversationId) return;
 
     const payload = {
@@ -693,7 +470,7 @@ export default function VendorsChatInner() {
 
     localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(next));
     setSessions(next);
-  }, [serverMode, conversationId, messages, intent, lead]);
+  }, [conversationId, messages, intent, lead]);
 
   const filteredSessions = useMemo(() => {
     const q = sessionQuery.trim().toLowerCase();
@@ -705,15 +482,10 @@ export default function VendorsChatInner() {
     );
   }, [sessions, sessionQuery]);
 
-  const filteredThreads = useMemo(() => {
-    const q = sessionQuery.trim().toLowerCase();
-    if (!q) return threads;
-    return threads.filter((t) => String(t?.title || "New conversation").toLowerCase().includes(q));
-  }, [threads, sessionQuery]);
-
   async function startConversationIfNeeded(): Promise<string> {
     if (conversationId) return conversationId;
 
+    // Always create a UUID first so local state and server inserts never see local_xxx junk
     const provisionalId = makeUuid();
     setConversationId(provisionalId);
 
@@ -732,18 +504,12 @@ export default function VendorsChatInner() {
           organisationId,
           agentId,
           conversationId: provisionalId,
-          threadId: activeThreadId || null,
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
-      if (data?.threadId) {
-        setActiveThreadId(String(data.threadId));
-        try {
-          localStorage.setItem(STORAGE_KEY_ACTIVE_THREAD, String(data.threadId));
-        } catch {}
-      }
+      const data = await res.json();
 
+      // If backend returns a different id, adopt it
       if (data?.ok && data?.conversationId && typeof data.conversationId === "string") {
         if (data.conversationId !== provisionalId) setConversationId(data.conversationId);
         return data.conversationId;
@@ -751,29 +517,12 @@ export default function VendorsChatInner() {
 
       return provisionalId;
     } catch {
+      // Offline is fine, we keep the provisional UUID
       return provisionalId;
     }
   }
 
-  async function startNewChat() {
-    if (serverMode) {
-      setInput("");
-      setLoading(false);
-      setSidebarOpen(false);
-
-      const newId = await createThread("couple");
-      if (newId) {
-        await refreshThreads(newId);
-        return;
-      }
-
-      setMessages([{ role: "assistant", content: OPENING_MESSAGE }]);
-      setActiveThreadId("");
-      setConversationId(null);
-      setIntent("unknown");
-      return;
-    }
-
+  function startNewChat() {
     localStorage.removeItem(STORAGE_KEY_CHAT_ACTIVE);
     setConversationId(null);
     setIntent("unknown");
@@ -800,20 +549,13 @@ export default function VendorsChatInner() {
     setSessions(next);
     localStorage.removeItem(convStorageKey(id));
 
-    if (conversationId === id) {
-      localStorage.removeItem(STORAGE_KEY_CHAT_ACTIVE);
-      setConversationId(null);
-      setIntent("unknown");
-      setInput("");
-      setLoading(false);
-      setSidebarOpen(false);
-      setMessages([{ role: "assistant", content: OPENING_MESSAGE }]);
-    }
+    if (conversationId === id) startNewChat();
   }
 
   async function handleSend(manual?: string) {
     const text = (manual ?? input).trim();
     if (!text) return;
+
     const nextIntent = intent === "unknown" ? detectIntent(text) : intent;
     if (nextIntent !== intent) setIntent(nextIntent);
 
@@ -824,17 +566,11 @@ export default function VendorsChatInner() {
     if (!manual) setInput("");
     setLoading(true);
 
-    
-    const shouldAutoTitle = serverMode && messages.every((m) => m.role !== "user");
-    let threadForTitle = activeThreadId;
-
-    
+    const id = await startConversationIfNeeded();
 
     try {
       const chatType =
         nextIntent === "vendor" ? "vendor" : nextIntent === "couple" ? "couple" : "couple";
-
-      const id = await startConversationIfNeeded();
 
       const res = await fetch("/api/vendors-chat", {
         method: "POST",
@@ -845,34 +581,19 @@ export default function VendorsChatInner() {
           conversationId: id,
           organisationId,
           agentId,
-          threadId: activeThreadId || null,
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
-      /* AUTO_TITLE_SAFE_CALL */
-      const isFirstUserMessageInThisThread = !messages.some((m) => m.role === "user");
-      const threadIdFromResponse = String(data?.threadId || "").trim();
-      const effectiveThreadId = String(threadIdFromResponse || activeThreadId || "").trim();
-
-      if (isFirstUserMessageInThisThread && effectiveThreadId) {
-        void maybeAutoTitleThread(effectiveThreadId, text);
-      }
-      /* AUTO_TITLE_SAFE_CALL_END */
-
-      const reply = String(data?.reply || "").trim();
+      const data = await res.json();
+      const reply = (data?.reply || "").trim();
 
       if (reply) {
-        const assistantMsg: ChatMessage = { role: "assistant", content: reply, suggestions: buildFollowUps(reply, intent) };
+        const assistantMsg: ChatMessage = { role: "assistant", content: reply };
         setMessages((prev) => clampMessages([...prev, assistantMsg], 80));
       } else {
         setMessages((prev) =>
           clampMessages([...prev, { role: "assistant", content: "I’m here. Say that again and I’ll answer properly." }], 80)
         );
-      }
-
-      if (serverMode && activeThreadId) {
-        await refreshThreads(activeThreadId);
       }
     } catch {
       setMessages((prev) =>
@@ -885,92 +606,6 @@ export default function VendorsChatInner() {
       setLoading(false);
     }
   }
-
-  
-  /* REGEN_EDIT_BEGIN */
-  function beginEdit(index: number) {
-    const m = (messages as any)[index];
-    if (!m || m.role !== "user") return;
-    setEditingUserIndex(index);
-    setEditDraft(String(m.content || ""));
-  }
-
-  function cancelEdit() {
-    setEditingUserIndex(-1);
-    setEditDraft("");
-  }
-
-  async function runChatFrom(messagesForRun: any[], opts?: { regenerate?: boolean }) {
-    const chatType = intent === "vendor" ? "vendor" : "couple";
-
-    setLoading(true);
-
-    try {
-      const id = await startConversationIfNeeded();
-
-      const res = await fetch("/api/vendors-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: messagesForRun,
-          chatType,
-          conversationId: id,
-          organisationId,
-          agentId,
-          threadId: activeThreadId || null,
-          regenerate: !!opts?.regenerate,
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      const reply = String(data?.reply || "").trim();
-
-      if (reply) {
-        setMessages((prev: any) => [...messagesForRun, { role: "assistant", content: reply, suggestions: buildFollowUps(reply, intent) }]);
-      } else {
-        setMessages((prev: any) => [...messagesForRun, { role: "assistant", content: "I’m here. Say that again and I’ll answer properly." }]);
-      }
-    } catch {
-      setMessages((prev: any) =>
-        [...messagesForRun, { role: "assistant", content: "Network issue. Try again, and I’ll pick up where we left off." }]
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function saveEdit(index: number) {
-    const nextText = String(editDraft || "").trim();
-    if (!nextText) return;
-
-    const updated = (messages as any).map((m: any, i: number) =>
-      i === index ? { ...m, content: nextText } : m
-    );
-
-    const truncated = updated.slice(0, index + 1);
-
-    setMessages(truncated);
-    setEditingUserIndex(-1);
-    setEditDraft("");
-
-    await runChatFrom(truncated, { regenerate: true });
-  }
-
-  async function handleRegenerate() {
-    if (loading) return;
-
-    const la = lastAssistantIndex;
-    if (la < 0) return;
-
-    const trimmed = (messages as any).slice(0, la);
-
-    if (trimmed.length === 0) return;
-
-    setMessages(trimmed);
-
-    await runChatFrom(trimmed, { regenerate: true });
-  }
-  /* REGEN_EDIT_END */
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -988,22 +623,6 @@ export default function VendorsChatInner() {
     () => messages.filter((m) => m.role === "assistant").length,
     [messages]
   );
-
-  /* REGEN_EDIT_MEMO_BEGIN */
-  const lastUserIndex = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if ((messages as any)[i]?.role === "user") return i;
-    }
-    return -1;
-  }, [messages]);
-
-  const lastAssistantIndex = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if ((messages as any)[i]?.role === "assistant") return i;
-    }
-    return -1;
-  }, [messages]);
-  /* REGEN_EDIT_MEMO_END */
 
   const shouldShowLeadCard =
     !lead?.email &&
@@ -1028,7 +647,6 @@ export default function VendorsChatInner() {
         conversationId,
         intent,
         source: "taigenic_concierge",
-        threadId: activeThreadId || null,
       }),
     }).catch(() => {});
 
@@ -1078,13 +696,13 @@ export default function VendorsChatInner() {
             <div className="text-[11px] text-gray-400 mt-1">
               Chat persona: {ASSISTANT}
             </div>
-            {serverMode ? (
-              <div className="text-[11px] text-gray-500 mt-1">
-                Threads enabled
+            {lead?.email ? (
+              <div className="text-[11px] text-gray-500 mt-1 truncate">
+                Saved as {lead.email}
               </div>
             ) : (
-              <div className="text-[11px] text-gray-500 mt-1">
-                Local history mode
+              <div className="text-[11px] text-gray-400 mt-1">
+                Save appears after a few replies
               </div>
             )}
           </div>
@@ -1115,7 +733,7 @@ export default function VendorsChatInner() {
             <input
               value={sessionQuery}
               onChange={(e) => setSessionQuery(e.target.value)}
-              placeholder={serverMode ? "Search threads" : "Search chats"}
+              placeholder="Search chats"
               className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
             />
           </div>
@@ -1126,109 +744,57 @@ export default function VendorsChatInner() {
         <div className="p-3">
           <div className="text-xs font-semibold text-gray-500 px-1 mb-2 flex items-center gap-2">
             <MessageSquare size={14} />
-            {serverMode ? "Threads" : "Chat history"}
+            Chat history
           </div>
 
-          {serverMode ? (
-            <>
-              {threadsLoading ? (
-                <div className="text-sm text-gray-500 p-3 rounded-xl bg-gray-50 border border-gray-200">
-                  Loading threads
-                </div>
-              ) : filteredThreads.length === 0 ? (
-                <div className="text-sm text-gray-500 p-3 rounded-xl bg-gray-50 border border-gray-200">
-                  No threads yet. Start a chat.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredThreads.map((t) => {
-                    const id = String(t?.id || "");
-                    const active = id && id === activeThreadId;
-                    const title = String(t?.title || "New conversation");
-                    return (
-                      <div
-                        key={id}
-                        className={`w-full p-3 rounded-xl border transition ${
-                          active ? "border-[#1F4D3E] bg-green-50/40" : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await loadThread(id);
-                            setSidebarOpen(false);
-                          }}
-                          className="w-full text-left"
-                        >
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {title}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate mt-0.5">
-                            {t?.chat_type ? String(t.chat_type) : "chat"}
-                          </div>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="mt-4 text-[11px] text-gray-500 leading-relaxed">
-                This list comes from your threads API. If threads are blocked, the UI falls back to local mode.
-              </div>
-            </>
+          {filteredSessions.length === 0 ? (
+            <div className="text-sm text-gray-500 p-3 rounded-xl bg-gray-50 border border-gray-200">
+              No chats yet. Start one, then it will appear here.
+            </div>
           ) : (
-            <>
-              {filteredSessions.length === 0 ? (
-                <div className="text-sm text-gray-500 p-3 rounded-xl bg-gray-50 border border-gray-200">
-                  No chats yet. Start one, then it will appear here.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredSessions.map((s) => {
-                    const active = conversationId === s.conversationId;
-                    return (
-                      <div
-                        key={s.conversationId}
-                        className={`w-full p-3 rounded-xl border transition ${
-                          active ? "border-[#1F4D3E] bg-green-50/40" : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => openSession(s.conversationId)}
-                          className="w-full text-left"
-                        >
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {s.title || "New chat"}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate mt-0.5">
-                            {s.lastMessage || "No messages yet"}
-                          </div>
-                        </button>
-
-                        <div className="mt-2 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (confirm("Delete this chat from this browser?")) deleteSession(s.conversationId);
-                            }}
-                            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
+            <div className="space-y-2">
+              {filteredSessions.map((s) => {
+                const active = conversationId === s.conversationId;
+                return (
+                  <div
+                    key={s.conversationId}
+                    className={`w-full p-3 rounded-xl border transition ${
+                      active ? "border-[#1F4D3E] bg-green-50/40" : "border-gray-200 bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openSession(s.conversationId)}
+                      className="w-full text-left"
+                    >
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {s.title || "New chat"}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div className="text-xs text-gray-500 truncate mt-0.5">
+                        {s.lastMessage || "No messages yet"}
+                      </div>
+                    </button>
 
-              <div className="mt-4 text-[11px] text-gray-500 leading-relaxed">
-                Chats store in this browser. Account sync arrives when registration is live.
-              </div>
-            </>
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm("Delete this chat from this browser?")) deleteSession(s.conversationId);
+                        }}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
+
+          <div className="mt-4 text-[11px] text-gray-500 leading-relaxed">
+            Chats store in this browser. Account sync arrives when registration is live.
+          </div>
         </div>
       </div>
 
@@ -1325,6 +891,7 @@ export default function VendorsChatInner() {
       </div>
     </div>
   );
+
   return (
     <div className="min-h-screen flex bg-gray-50">
       {!isEmbed && (
@@ -1379,94 +946,7 @@ export default function VendorsChatInner() {
                         : "bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-bl-sm"
                     }`}
                   >
-                    {m.role === "user" ? (
-                      <div className="space-y-2">
-                        {editingUserIndex === i ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={editDraft}
-                              onChange={(e) => setEditDraft(e.target.value)}
-                              className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
-                              rows={3}
-                            />
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={cancelEdit}
-                                className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => saveEdit(i)}
-                                className="text-xs px-3 py-1.5 rounded-lg bg-[#1F4D3E] text-white hover:bg-[#163C30]"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="whitespace-pre-wrap">{m.content}</div>
-                        )}
-
-                        {i === lastUserIndex && !loading && editingUserIndex !== i ? (
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => beginEdit(i)}
-                              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <FormattedMessage content={m.content} />
-                        
-                        {/* FOLLOWUPS_RENDER */}
-                        {i === lastAssistantIndex && !loading ? (
-                          (() => {
-                            const sugs = (m as any).suggestions;
-                            const list =
-                              Array.isArray(sugs) && sugs.length
-                                ? sugs
-                                : (typeof buildFollowUps === "function"
-                                    ? buildFollowUps(String((m as any).content || ""), intent)
-                                    : []);
-
-                            return Array.isArray(list) && list.length ? (
-                              <div className="flex flex-wrap gap-2 pt-2">
-                                {list.slice(0, 3).map((s: string, k: number) => (
-                                  <button
-                                    key={k}
-                                    type="button"
-                                    onClick={() => handleSend(s)}
-                                    className="text-xs px-3 py-1.5 rounded-full border border-gray-200 bg-white hover:bg-gray-50"
-                                  >
-                                    {s}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null;
-                          })()
-                        ) : null}
-
-{i === lastAssistantIndex && !loading ? (
-                          <div className="flex">
-                            <button
-                              type="button"
-                              onClick={handleRegenerate}
-                              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                            >
-                              Regenerate
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
+                    {m.role === "user" ? m.content : <FormattedMessage content={m.content} />}
                   </div>
                 </div>
               ))}
@@ -1489,7 +969,6 @@ export default function VendorsChatInner() {
                 <div className="flex justify-start w-full">
                   <div className="w-8 h-8 mr-2" />
                   <div className="bg-white border border-gray-100 px-5 py-4 rounded-2xl rounded-bl-sm flex space-x-1 items-center shadow-sm">
-                    <div className="text-xs text-gray-500 mr-2">Aura is typing</div>
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
@@ -1550,9 +1029,7 @@ export default function VendorsChatInner() {
                 {copied ? "Copied" : `Copy ${DIRECTORY_DOMAIN}`}
               </button>
 
-              {serverMode ? (
-                <span className="text-gray-400">Thread: {activeThreadId ? "Active" : "None"}</span>
-              ) : lead?.email ? (
+              {lead?.email ? (
                 <span className="text-gray-400">Saved as {lead.email}</span>
               ) : (
                 <span className="text-gray-400">Saving appears after a few replies</span>

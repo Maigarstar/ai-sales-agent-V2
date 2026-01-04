@@ -1427,33 +1427,23 @@ export default function VendorsChatInner() {
                         <FormattedMessage content={m.content} />
                         
                         {/* FOLLOWUPS_RENDER */}
-                        {i === lastAssistantIndex && !loading ? (
-                          (() => {
-                            const sugs = (m as any).suggestions;
-                            const list =
-                              Array.isArray(sugs) && sugs.length
-                                ? sugs
-                                : (typeof buildFollowUps === "function"
-                                    ? buildFollowUps(String((m as any).content || ""), intent)
-                                    : []);
-
-                            return Array.isArray(list) && list.length ? (
-                              <div className="flex flex-wrap gap-2 pt-2">
-                                {list.slice(0, 3).map((s: string, k: number) => (
-                                  <button
-                                    key={k}
-                                    type="button"
-                                    onClick={() => handleSend(s)}
-                                    className="text-xs px-3 py-1.5 rounded-full border border-gray-200 bg-white hover:bg-gray-50"
-                                  >
-                                    {s}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null;
-                          })()
+                        {Array.isArray((m as any).suggestions) &&
+                        (m as any).suggestions.length > 0 &&
+                        i === lastAssistantIndex &&
+                        !loading ? (
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            {(m as any).suggestions.slice(0, 3).map((s: string, k: number) => (
+                              <button
+                                key={k}
+                                type="button"
+                                onClick={() => handleSend(s)}
+                                className="text-xs px-3 py-1.5 rounded-full border border-gray-200 bg-white hover:bg-gray-50"
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
                         ) : null}
-
 {i === lastAssistantIndex && !loading ? (
                           <div className="flex">
                             <button

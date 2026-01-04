@@ -416,9 +416,6 @@ function shortLabel(s: string, max = 34) {
   return `${clean.slice(0, Math.max(0, max - 3))}...`;
 }
 
-
-  
-
 export default function VisionWorkspace() {
   const searchParams = useSearchParams();
 
@@ -464,105 +461,6 @@ export default function VisionWorkspace() {
 
   // Suggested follow ups
   const [followUps, setFollowUps] = useState<string[]>([]);
-
-  /* PREMIUM_VISION_BEGIN */
-  const followUpsDoneRef = useRef<Set<string>>(new Set());
-  const titledThreadsRef = useRef<Set<string>>(new Set());
-
-  function pickLastUserText(list: any[]) {
-    for (let i = list.length - 1; i >= 0; i--) {
-      if (list?.[i]?.role === "user") {
-        const t = String(list[i]?.content || "").trim();
-        if (t) return t;
-      }
-    }
-    return "";
-  }
-
-  function makePremiumTitle(text: string) {
-    const clean = String(text || "")
-      .replace(/\s+/g, " ")
-      .replace(/[\u2018\u2019\u201C\u201D"'\`]/g, "")
-      .trim();
-
-    if (!clean) return "Conversation";
-    if (clean.length <= 56) return clean;
-    return clean.slice(0, 56) + "…";
-  }
-
-  useEffect(() => {
-    const list: any[] = (followUps as any[]) || [];
-
-    const lastAssistantIndex = (() => {
-      for (let i = list.length - 1; i >= 0; i--) {
-        if (list[i]?.role === "assistant") return i;
-      }
-      return -1;
-    })();
-
-    if (lastAssistantIndex < 0) return;
-
-    const lastA: any = list[lastAssistantIndex];
-    if (Array.isArray(lastA?.suggestions) && lastA.suggestions.length) return;
-
-    const key = String(lastAssistantIndex) + ":" + String(lastA?.content || "").slice(0, 120);
-    if (followUpsDoneRef.current.has(key)) return;
-    followUpsDoneRef.current.add(key);
-
-    (async () => {
-      try {
-        const userMessage = pickLastUserText(list);
-        const res = await fetch("/api/followups", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            flow: "aura",
-            userMessage,
-            reply: String(lastA?.content || ""),
-          }),
-        });
-
-        if (!res.ok) return;
-        const data = await res.json().catch(() => ({} as any));
-        const followUps = Array.isArray(data?.followUps) ? data.followUps : [];
-        if (!followUps.length) return;
-
-        setFollowUps((prev: any) => {
-          const copy = Array.isArray(prev) ? [...prev] : [];
-          const m = copy[lastAssistantIndex];
-          if (!m || m.role !== "assistant") return prev;
-          if (Array.isArray(m?.suggestions) && m.suggestions.length) return prev;
-          copy[lastAssistantIndex] = { ...m, suggestions: followUps.slice(0, 3) };
-          return copy;
-        });
-      } catch {
-        // ignore
-      }
-    })();
-  }, [followUps]);
-
-  
-  useEffect(() => {
-    if (!activeThreadId) return;
-    if (titledThreadsRef.current.has(activeThreadId)) return;
-
-    const firstUser = (followUps as any[]).find((m: any) => m?.role === "user" && String(m?.content || "").trim());
-    if (!firstUser) return;
-
-    const title = makePremiumTitle(String(firstUser.content || ""));
-    titledThreadsRef.current.add(activeThreadId);
-
-    fetch(`/api/threads/${activeThreadId}/title`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    }).catch(() => {});
-  }, [activeThreadId, followUps]);
-  
-
-  /* PREMIUM_VISION_END */
-
-
 
   // Follow ups dock
   const [followUpsDockEnabled, setFollowUpsDockEnabled] = useState(true);

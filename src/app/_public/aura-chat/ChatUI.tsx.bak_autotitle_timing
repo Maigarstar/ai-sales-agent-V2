@@ -69,7 +69,7 @@ const VENDOR_PROMPTS = [
 /* =========================================================
    Types
 ========================================================= */
-type ChatMessage = { role: "user" | "assistant"; content: string; suggestions?: string[] };
+type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type Intent = "couple" | "vendor" | "unknown";
 
@@ -169,41 +169,6 @@ function detectIntent(text: string): Intent {
   if (coupleHit && !vendorHit) return "couple";
   return "unknown";
 }
-
-/* FOLLOWUPS_BEGIN */
-function buildFollowUps(reply: string, intent: Intent): string[] {
-  const r = String(reply || "").toLowerCase();
-
-  const couple = [
-    "Show me 3 venue ideas for this",
-    "Give me a budget split for this",
-    "Create a timeline checklist for this",
-  ];
-
-  const vendor = [
-    "Rewrite my positioning in luxury tone",
-    "Give me 5 SEO fixes to do today",
-    "Create a premium package offer",
-  ];
-
-  const neutral = [
-    "Ask me 3 questions to refine this",
-    "Summarise options in 3 bullets",
-    "What should we decide next",
-  ];
-
-  if (intent === "vendor") return vendor;
-
-  if (intent === "couple") {
-    if (r.includes("budget")) return ["Break down the budget in detail", "What vendors do we book first", "Create a 12 month plan"];
-    if (r.includes("venue") || r.includes("venues")) return ["Compare 3 venues side by side", "What questions should we ask venues", "Suggest the best season for this"];
-    return couple;
-  }
-
-  return neutral;
-}
-/* FOLLOWUPS_END */
-
 
 /* =========================================================
    UUID helper
@@ -417,8 +382,6 @@ export default function VendorsChatInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [editingUserIndex, setEditingUserIndex] = useState<number>(-1);
-  const [editDraft, setEditDraft] = useState<string>("");
 
   const [intent, setIntent] = useState<Intent>("unknown");
 
@@ -434,56 +397,6 @@ export default function VendorsChatInner() {
   const [copied, setCopied] = useState(false);
 
   const [activeThreadId, setActiveThreadId] = useState<string>("");
-
-  /* AUTO_TITLE_SAFE_BEGIN */
-  const titledThreadIdsRef = useRef<Set<string>>(new Set());
-
-  function makeThreadTitleFromText(text: string) {
-    const clean = String(text || "")
-      .replace(/\s+/g, " ")
-      .replace(/[\`"'“”]/g, "")
-      .trim();
-
-    if (!clean) return "Conversation";
-
-    const max = 64;
-    return clean.length <= max ? clean : clean.slice(0, max).trim() + "…";
-  }
-
-  async function maybeAutoTitleThread(threadId: string, firstUserText: string) {
-    const id = String(threadId || "").trim();
-    if (!id) return;
-
-    if (titledThreadIdsRef.current.has(id)) return;
-    titledThreadIdsRef.current.add(id);
-
-    const title = makeThreadTitleFromText(firstUserText);
-
-    try {
-      const res = await fetch(`/api/threads/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-      
-
-        const savedTitle = String(data?.thread?.title || title);
-
-        setThreads((prev: any) =>
-          Array.isArray(prev)
-            ? prev.map((t: any) => (t?.id === id ? { ...t, title: savedTitle } : t))
-            : prev
-        );
-      }
-    } catch {
-      // ignore
-    }
-  }
-  /* AUTO_TITLE_SAFE_END */
-
   const [serverMode, setServerMode] = useState(false);
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
@@ -597,7 +510,49 @@ export default function VendorsChatInner() {
   }
 
 
-  
+  /* AUTO_THREAD_TITLE_BEGIN */
+  function makeThreadTitleFromText(text: string) {
+    const clean = String(text || "")
+      .replace(/\s+/g, " ")
+      .replace(/[“”"]/g, "")
+      .trim();
+
+    if (!clean) return "Conversation";
+
+    const max = 56;
+    if (clean.length <= max) return clean;
+
+    return clean.slice(0, max).trim() + "…";
+  }
+
+  async function setThreadTitle(threadId: string, title: string) {
+    const id = String(threadId || "").trim();
+    const t = String(title || "").trim();
+    if (!id || !t) return;
+
+    try {
+      const res = await fetch(`/api/threads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: t }),
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json().catch(() => ({}));
+      const updatedTitle = String(data?.thread?.title || t);
+
+      setThreads((prev) =>
+        Array.isArray(prev)
+          ? prev.map((x: any) => (x?.id === id ? { ...x, title: updatedTitle } : x))
+          : prev
+      );
+    } catch {
+      // ignore
+    }
+  }
+  /* AUTO_THREAD_TITLE_END */
+
   /* Bootstrap, prefer server threads, else fall back to local storage */
   useEffect(() => {
     (async () => {
@@ -814,6 +769,18 @@ export default function VendorsChatInner() {
   async function handleSend(manual?: string) {
     const text = (manual ?? input).trim();
     if (!text) return;
+
+    /* AUTO_THREAD_TITLE_CALL */
+    if (serverMode && activeThreadId) {
+      const hadUserBefore = messages.some((m) => m.role === "user");
+      if (!hadUserBefore) {
+        const title = makeThreadTitleFromText(text);
+        void setThreadTitle(activeThreadId, title);
+      }
+    }
+    /* AUTO_THREAD_TITLE_CALL_END */
+
+
     const nextIntent = intent === "unknown" ? detectIntent(text) : intent;
     if (nextIntent !== intent) setIntent(nextIntent);
 
@@ -824,17 +791,22 @@ export default function VendorsChatInner() {
     if (!manual) setInput("");
     setLoading(true);
 
-    
-    const shouldAutoTitle = serverMode && messages.every((m) => m.role !== "user");
-    let threadForTitle = activeThreadId;
+    if (serverMode && !activeThreadId) {
+      const newId = await createThread("couple");
+      if (newId) {
+        setActiveThreadId(newId);
+        try {
+          localStorage.setItem(STORAGE_KEY_ACTIVE_THREAD, newId);
+        } catch {}
+        await refreshThreads(newId);
+      }
+    }
 
-    
+    const id = await startConversationIfNeeded();
 
     try {
       const chatType =
         nextIntent === "vendor" ? "vendor" : nextIntent === "couple" ? "couple" : "couple";
-
-      const id = await startConversationIfNeeded();
 
       const res = await fetch("/api/vendors-chat", {
         method: "POST",
@@ -850,20 +822,10 @@ export default function VendorsChatInner() {
       });
 
       const data = await res.json().catch(() => ({}));
-      /* AUTO_TITLE_SAFE_CALL */
-      const isFirstUserMessageInThisThread = !messages.some((m) => m.role === "user");
-      const threadIdFromResponse = String(data?.threadId || "").trim();
-      const effectiveThreadId = String(threadIdFromResponse || activeThreadId || "").trim();
-
-      if (isFirstUserMessageInThisThread && effectiveThreadId) {
-        void maybeAutoTitleThread(effectiveThreadId, text);
-      }
-      /* AUTO_TITLE_SAFE_CALL_END */
-
       const reply = String(data?.reply || "").trim();
 
       if (reply) {
-        const assistantMsg: ChatMessage = { role: "assistant", content: reply, suggestions: buildFollowUps(reply, intent) };
+        const assistantMsg: ChatMessage = { role: "assistant", content: reply };
         setMessages((prev) => clampMessages([...prev, assistantMsg], 80));
       } else {
         setMessages((prev) =>
@@ -886,92 +848,6 @@ export default function VendorsChatInner() {
     }
   }
 
-  
-  /* REGEN_EDIT_BEGIN */
-  function beginEdit(index: number) {
-    const m = (messages as any)[index];
-    if (!m || m.role !== "user") return;
-    setEditingUserIndex(index);
-    setEditDraft(String(m.content || ""));
-  }
-
-  function cancelEdit() {
-    setEditingUserIndex(-1);
-    setEditDraft("");
-  }
-
-  async function runChatFrom(messagesForRun: any[], opts?: { regenerate?: boolean }) {
-    const chatType = intent === "vendor" ? "vendor" : "couple";
-
-    setLoading(true);
-
-    try {
-      const id = await startConversationIfNeeded();
-
-      const res = await fetch("/api/vendors-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: messagesForRun,
-          chatType,
-          conversationId: id,
-          organisationId,
-          agentId,
-          threadId: activeThreadId || null,
-          regenerate: !!opts?.regenerate,
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      const reply = String(data?.reply || "").trim();
-
-      if (reply) {
-        setMessages((prev: any) => [...messagesForRun, { role: "assistant", content: reply, suggestions: buildFollowUps(reply, intent) }]);
-      } else {
-        setMessages((prev: any) => [...messagesForRun, { role: "assistant", content: "I’m here. Say that again and I’ll answer properly." }]);
-      }
-    } catch {
-      setMessages((prev: any) =>
-        [...messagesForRun, { role: "assistant", content: "Network issue. Try again, and I’ll pick up where we left off." }]
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function saveEdit(index: number) {
-    const nextText = String(editDraft || "").trim();
-    if (!nextText) return;
-
-    const updated = (messages as any).map((m: any, i: number) =>
-      i === index ? { ...m, content: nextText } : m
-    );
-
-    const truncated = updated.slice(0, index + 1);
-
-    setMessages(truncated);
-    setEditingUserIndex(-1);
-    setEditDraft("");
-
-    await runChatFrom(truncated, { regenerate: true });
-  }
-
-  async function handleRegenerate() {
-    if (loading) return;
-
-    const la = lastAssistantIndex;
-    if (la < 0) return;
-
-    const trimmed = (messages as any).slice(0, la);
-
-    if (trimmed.length === 0) return;
-
-    setMessages(trimmed);
-
-    await runChatFrom(trimmed, { regenerate: true });
-  }
-  /* REGEN_EDIT_END */
-
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -988,22 +864,6 @@ export default function VendorsChatInner() {
     () => messages.filter((m) => m.role === "assistant").length,
     [messages]
   );
-
-  /* REGEN_EDIT_MEMO_BEGIN */
-  const lastUserIndex = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if ((messages as any)[i]?.role === "user") return i;
-    }
-    return -1;
-  }, [messages]);
-
-  const lastAssistantIndex = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if ((messages as any)[i]?.role === "assistant") return i;
-    }
-    return -1;
-  }, [messages]);
-  /* REGEN_EDIT_MEMO_END */
 
   const shouldShowLeadCard =
     !lead?.email &&
@@ -1379,94 +1239,7 @@ export default function VendorsChatInner() {
                         : "bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-bl-sm"
                     }`}
                   >
-                    {m.role === "user" ? (
-                      <div className="space-y-2">
-                        {editingUserIndex === i ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={editDraft}
-                              onChange={(e) => setEditDraft(e.target.value)}
-                              className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-1 focus:ring-[#1F4D3E] focus:border-[#1F4D3E]"
-                              rows={3}
-                            />
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={cancelEdit}
-                                className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => saveEdit(i)}
-                                className="text-xs px-3 py-1.5 rounded-lg bg-[#1F4D3E] text-white hover:bg-[#163C30]"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="whitespace-pre-wrap">{m.content}</div>
-                        )}
-
-                        {i === lastUserIndex && !loading && editingUserIndex !== i ? (
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => beginEdit(i)}
-                              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <FormattedMessage content={m.content} />
-                        
-                        {/* FOLLOWUPS_RENDER */}
-                        {i === lastAssistantIndex && !loading ? (
-                          (() => {
-                            const sugs = (m as any).suggestions;
-                            const list =
-                              Array.isArray(sugs) && sugs.length
-                                ? sugs
-                                : (typeof buildFollowUps === "function"
-                                    ? buildFollowUps(String((m as any).content || ""), intent)
-                                    : []);
-
-                            return Array.isArray(list) && list.length ? (
-                              <div className="flex flex-wrap gap-2 pt-2">
-                                {list.slice(0, 3).map((s: string, k: number) => (
-                                  <button
-                                    key={k}
-                                    type="button"
-                                    onClick={() => handleSend(s)}
-                                    className="text-xs px-3 py-1.5 rounded-full border border-gray-200 bg-white hover:bg-gray-50"
-                                  >
-                                    {s}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null;
-                          })()
-                        ) : null}
-
-{i === lastAssistantIndex && !loading ? (
-                          <div className="flex">
-                            <button
-                              type="button"
-                              onClick={handleRegenerate}
-                              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                            >
-                              Regenerate
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
+                    {m.role === "user" ? m.content : <FormattedMessage content={m.content} />}
                   </div>
                 </div>
               ))}
@@ -1489,7 +1262,6 @@ export default function VendorsChatInner() {
                 <div className="flex justify-start w-full">
                   <div className="w-8 h-8 mr-2" />
                   <div className="bg-white border border-gray-100 px-5 py-4 rounded-2xl rounded-bl-sm flex space-x-1 items-center shadow-sm">
-                    <div className="text-xs text-gray-500 mr-2">Aura is typing</div>
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" />

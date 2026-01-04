@@ -1426,6 +1426,7 @@ export default function VendorsChatInner() {
                       <div className="space-y-2">
                         <FormattedMessage content={m.content} />
                         
+                        {
                         {/* FOLLOWUPS_RENDER */}
                         {i === lastAssistantIndex && !loading ? (
                           (() => {

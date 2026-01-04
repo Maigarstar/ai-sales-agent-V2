@@ -1,43 +1,6 @@
 // src/app/vision/VisionWorkspace.tsx
 "use client";
 
-/* VISION_PILLS_BEGIN */
-function buildVisionPills(reply: string): string[] {
-  const r = String(reply || "").toLowerCase();
-
-  if (r.includes("planner")) {
-    return [
-      "Which country or city are you considering",
-      "How many guests, and what season",
-      "What is your comfortable budget range",
-    ];
-  }
-
-  if (r.includes("venue")) {
-    return [
-      "Compare 3 venues side by side",
-      "What questions should we ask venues",
-      "Suggest the best season for this",
-    ];
-  }
-
-  if (r.includes("budget")) {
-    return [
-      "Break down the budget in detail",
-      "What vendors do we book first",
-      "Create a 12 month plan",
-    ];
-  }
-
-  return [
-    "Ask me 3 questions to refine this",
-    "Summarise options in 3 bullets",
-    "What should we decide next",
-  ];
-}
-/* VISION_PILLS_END */
-
-
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
@@ -416,9 +379,6 @@ function shortLabel(s: string, max = 34) {
   return `${clean.slice(0, Math.max(0, max - 3))}...`;
 }
 
-
-  
-
 export default function VisionWorkspace() {
   const searchParams = useSearchParams();
 
@@ -464,105 +424,6 @@ export default function VisionWorkspace() {
 
   // Suggested follow ups
   const [followUps, setFollowUps] = useState<string[]>([]);
-
-  /* PREMIUM_VISION_BEGIN */
-  const followUpsDoneRef = useRef<Set<string>>(new Set());
-  const titledThreadsRef = useRef<Set<string>>(new Set());
-
-  function pickLastUserText(list: any[]) {
-    for (let i = list.length - 1; i >= 0; i--) {
-      if (list?.[i]?.role === "user") {
-        const t = String(list[i]?.content || "").trim();
-        if (t) return t;
-      }
-    }
-    return "";
-  }
-
-  function makePremiumTitle(text: string) {
-    const clean = String(text || "")
-      .replace(/\s+/g, " ")
-      .replace(/[\u2018\u2019\u201C\u201D"'\`]/g, "")
-      .trim();
-
-    if (!clean) return "Conversation";
-    if (clean.length <= 56) return clean;
-    return clean.slice(0, 56) + "…";
-  }
-
-  useEffect(() => {
-    const list: any[] = (followUps as any[]) || [];
-
-    const lastAssistantIndex = (() => {
-      for (let i = list.length - 1; i >= 0; i--) {
-        if (list[i]?.role === "assistant") return i;
-      }
-      return -1;
-    })();
-
-    if (lastAssistantIndex < 0) return;
-
-    const lastA: any = list[lastAssistantIndex];
-    if (Array.isArray(lastA?.suggestions) && lastA.suggestions.length) return;
-
-    const key = String(lastAssistantIndex) + ":" + String(lastA?.content || "").slice(0, 120);
-    if (followUpsDoneRef.current.has(key)) return;
-    followUpsDoneRef.current.add(key);
-
-    (async () => {
-      try {
-        const userMessage = pickLastUserText(list);
-        const res = await fetch("/api/followups", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            flow: "aura",
-            userMessage,
-            reply: String(lastA?.content || ""),
-          }),
-        });
-
-        if (!res.ok) return;
-        const data = await res.json().catch(() => ({} as any));
-        const followUps = Array.isArray(data?.followUps) ? data.followUps : [];
-        if (!followUps.length) return;
-
-        setFollowUps((prev: any) => {
-          const copy = Array.isArray(prev) ? [...prev] : [];
-          const m = copy[lastAssistantIndex];
-          if (!m || m.role !== "assistant") return prev;
-          if (Array.isArray(m?.suggestions) && m.suggestions.length) return prev;
-          copy[lastAssistantIndex] = { ...m, suggestions: followUps.slice(0, 3) };
-          return copy;
-        });
-      } catch {
-        // ignore
-      }
-    })();
-  }, [followUps]);
-
-  
-  useEffect(() => {
-    if (!activeThreadId) return;
-    if (titledThreadsRef.current.has(activeThreadId)) return;
-
-    const firstUser = (followUps as any[]).find((m: any) => m?.role === "user" && String(m?.content || "").trim());
-    if (!firstUser) return;
-
-    const title = makePremiumTitle(String(firstUser.content || ""));
-    titledThreadsRef.current.add(activeThreadId);
-
-    fetch(`/api/threads/${activeThreadId}/title`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    }).catch(() => {});
-  }, [activeThreadId, followUps]);
-  
-
-  /* PREMIUM_VISION_END */
-
-
 
   // Follow ups dock
   const [followUpsDockEnabled, setFollowUpsDockEnabled] = useState(true);
@@ -2980,26 +2841,7 @@ export default function VisionWorkspace() {
                     <Mic size={18} style={{ color: isLightMode ? "#3f3f3f" : BRAND_GOLD }} />
                   </button>
 
-                                    {/* VISION_PILLS_RENDER */}
-                  {(() => {
-                    const lastA = [...messages].reverse().find((m: any) => m?.role === "assistant");
-                    const list = buildVisionPills(lastA?.content || "");
-                    return Array.isArray(list) && list.length ? (
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {list.slice(0, 3).map((s: string, k: number) => (
-                          <button
-                            key={k}
-                            type="button"
-                            onClick={() => { setInput(s); setTimeout(() => handleSend(), 0); }}
-                            className="text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/80"
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null;
-                  })()}
-<textarea
+                  <textarea
                     ref={textareaRef}
                     value={input}
                     onChange={(e) => {
@@ -3012,7 +2854,7 @@ export default function VisionWorkspace() {
                         handleSend();
                       }
                     }}
-              placeholder={chatType === "business" ? "Tell Atlas what you want to achieve." : "Tell Aura what you are creating."}
+                    placeholder={chatType === "business" ? "Tell Atlas what you want to achieve." : "Tell Aura what you are creating."}
                     className="flex-1 bg-transparent outline-none resize-none leading-[1.4] pt-[2px]"
                     style={{
                       height: 44,

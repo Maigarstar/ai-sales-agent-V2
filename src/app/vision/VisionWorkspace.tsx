@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import {
   Menu,
   Sun,
@@ -28,6 +28,7 @@ import {
   GitBranch,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from "lucide-react";
 
 type ChatRole = "user" | "assistant";
@@ -72,6 +73,9 @@ const GALLERY_PREF_KEY = "taigenic_vision_gallery_on_v1";
 /* Follow ups dock on, off */
 const FOLLOWUPS_PREF_KEY = "taigenic_vision_followups_dock_on_v1";
 
+/* Follow ups dock Y position */
+const FOLLOWUPS_DOCK_Y_KEY = "taigenic_vision_followups_dock_y_v1";
+
 function gateDismissedRecently() {
   if (typeof window === "undefined") return false;
   try {
@@ -97,6 +101,15 @@ function uid(prefix = "m") {
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
+}
+
+function formatThreadTsUTC(ts: number) {
+  try {
+    const iso = new Date(ts).toISOString(); // stable, UTC
+    return iso.slice(0, 16).replace("T", " ");
+  } catch {
+    return "";
+  }
 }
 
 /* Follow ups */
@@ -362,10 +375,12 @@ function shortLabel(s: string, max = 34) {
 
 export default function VisionWorkspace() {
   const searchParams = useSearchParams();
+
   const [mounted, setMounted] = useState(false);
 
   // viewport
   const [viewportW, setViewportW] = useState(1200);
+  const [viewportH, setViewportH] = useState(800);
 
   // UI
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -380,6 +395,12 @@ export default function VisionWorkspace() {
   // Auth gate
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [showRegisterChooser, setShowRegisterChooser] = useState(false);
+
+  // Sidebar search and rename
+  const [sidebarQuery, setSidebarQuery] = useState("");
+  const [renamingThreadId, setRenamingThreadId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   // Chat
   const [chatType, setChatType] = useState<ChatType>("couple");
@@ -402,6 +423,12 @@ export default function VisionWorkspace() {
   const [followUpsDockEnabled, setFollowUpsDockEnabled] = useState(true);
   const [followUpsDockOpen, setFollowUpsDockOpen] = useState(true);
 
+  // Floating dock drag
+  const [dockHeight, setDockHeight] = useState(340);
+  const [dockYSaved, setDockYSaved] = useState(0);
+  const dockRef = useRef<HTMLDivElement | null>(null);
+  const dockY = useMotionValue(0);
+
   // Toast
   const [toast, setToast] = useState<string | null>(null);
 
@@ -420,8 +447,6 @@ export default function VisionWorkspace() {
 
   // Cloud sync debounce
   const syncTimerRef = useRef<number | null>(null);
-
-  const personaName = chatType === "business" ? "Atlas" : "Aura";
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -691,13 +716,21 @@ export default function VisionWorkspace() {
     });
   };
 
+  // Hook stable mount and resize
   useEffect(() => {
     setMounted(true);
 
     const w = typeof window !== "undefined" ? window.innerWidth : 1200;
-    setViewportW(w);
+    const h = typeof window !== "undefined" ? window.innerHeight : 800;
 
-    const onResize = () => setViewportW(window.innerWidth);
+    setViewportW(w);
+    setViewportH(h);
+
+    const onResize = () => {
+      setViewportW(window.innerWidth);
+      setViewportH(window.innerHeight);
+    };
+
     window.addEventListener("resize", onResize);
 
     const initialType: ChatType = searchParams.get("chatType") === "business" ? "business" : "couple";
@@ -742,6 +775,12 @@ export default function VisionWorkspace() {
       if (raw === "false") setFollowUpsDockEnabled(false);
     } catch {}
 
+    try {
+      const rawY = localStorage.getItem(FOLLOWUPS_DOCK_Y_KEY);
+      const y = rawY ? Number(rawY) : 0;
+      if (Number.isFinite(y)) setDockYSaved(y);
+    } catch {}
+
     if (typeof window !== "undefined") {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -784,12 +823,10 @@ export default function VisionWorkspace() {
 
     return () => {
       window.removeEventListener("resize", onResize);
-      try {
-        recognitionRef.current?.stop?.();
-      } catch {}
     };
   }, [searchParams]);
 
+  // Persist prefs
   useEffect(() => {
     if (!mounted) return;
     try {
@@ -804,6 +841,7 @@ export default function VisionWorkspace() {
     } catch {}
   }, [mounted, followUpsDockEnabled]);
 
+  // Persist threads
   useEffect(() => {
     if (!mounted) return;
     try {
@@ -815,6 +853,7 @@ export default function VisionWorkspace() {
     } catch {}
   }, [threads, mounted]);
 
+  // Scroll chat to bottom on new messages
   useEffect(() => {
     if (!mounted) return;
     scrollRef.current?.scrollTo({
@@ -823,6 +862,7 @@ export default function VisionWorkspace() {
     });
   }, [mounted, messages, loading]);
 
+  // Auto size textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -831,13 +871,18 @@ export default function VisionWorkspace() {
     el.style.height = `${next}px`;
   }, [input]);
 
+  // Thread change cleanup
   useEffect(() => {
     clearFollowUps();
     setEditingId(null);
     setEditDraft("");
     setHasStreamedAny(false);
+    setRenamingThreadId(null);
+    setRenameDraft("");
+    setSidebarQuery("");
   }, [activeThreadId]);
 
+  // Inject intro into empty thread
   useEffect(() => {
     if (!mounted) return;
     if (!currentThread) return;
@@ -854,7 +899,7 @@ export default function VisionWorkspace() {
 
     let i = 0;
     const full = introText;
-    const tick = setInterval(() => {
+    const tick = window.setInterval(() => {
       i += 2;
       const partial = full.slice(0, i);
       setThreads((prev) =>
@@ -868,12 +913,13 @@ export default function VisionWorkspace() {
             : t
         )
       );
-      if (i >= full.length) clearInterval(tick);
+      if (i >= full.length) window.clearInterval(tick);
     }, 18);
 
-    return () => clearInterval(tick);
+    return () => window.clearInterval(tick);
   }, [mounted, currentThread?.id, introText]);
 
+  // Lightbox key events
   useEffect(() => {
     if (!lightboxOpen) return;
 
@@ -898,12 +944,85 @@ export default function VisionWorkspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxOpen, lightboxItems.length]);
 
+  // Auto open dock when suggestions arrive
   useEffect(() => {
     if (!followUpsDockEnabled) return;
     if (followUps.length > 0) setFollowUpsDockOpen(true);
   }, [followUpsDockEnabled, followUps.length]);
 
-  if (!mounted) return <div className="h-screen w-full bg-[#070707]" />;
+  // Focus rename input when entering rename mode
+  useEffect(() => {
+    if (!renamingThreadId) return;
+    const t = window.setTimeout(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }, 40);
+    return () => window.clearTimeout(t);
+  }, [renamingThreadId]);
+
+  // Measure dock height
+  useEffect(() => {
+    const el = dockRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      const h = Math.round(r.height || 340);
+      if (h > 0) setDockHeight(h);
+    };
+    measure();
+    const t = window.setTimeout(measure, 50);
+    return () => window.clearTimeout(t);
+  }, [followUpsDockOpen, followUpsDockEnabled, followUps.length, viewportW]);
+
+  // Set and persist dock motion value
+  useEffect(() => {
+    dockY.set(dockYSaved);
+  }, [dockYSaved, dockY]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      localStorage.setItem(FOLLOWUPS_DOCK_Y_KEY, String(dockYSaved));
+    } catch {}
+  }, [mounted, dockYSaved]);
+
+  // Clamp saved dock position when viewport changes
+  const baseDockTop = useMemo(() => {
+    if (isNarrow) return Math.max(140, viewportH - 440);
+    return 184;
+  }, [isNarrow, viewportH]);
+
+  const dockLeft = useMemo(() => {
+    if (isNarrow) return 14;
+    if (isSidebarOpen && !mobileSidebar) return 312;
+    return 14;
+  }, [isNarrow, isSidebarOpen, mobileSidebar]);
+
+  const dockMinTop = 110;
+  const dockMaxTop = Math.max(dockMinTop + 20, viewportH - dockHeight - 110);
+
+  const dockConstraintTop = dockMinTop - baseDockTop;
+  const dockConstraintBottom = dockMaxTop - baseDockTop;
+
+  useEffect(() => {
+    const next = clamp(dockYSaved, dockConstraintTop, dockConstraintBottom);
+    if (next !== dockYSaved) setDockYSaved(next);
+  }, [dockConstraintTop, dockConstraintBottom]); // stable hook
+
+  const showDock =
+    (followUpsDockEnabled && followUps.length > 0 && !loading && !editingId && !showAuthGate && !showVoiceOverlay) ||
+    (!followUpsDockEnabled && !showAuthGate && !showVoiceOverlay);
+
+  const dockTitle = chatType === "business" ? "Atlas ideas" : "Aura ideas";
+
+  const dockPanelBg = isLightMode ? "rgba(255,255,255,0.96)" : "rgba(14,14,14,0.86)";
+  const dockPanelBorder = isLightMode ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.12)";
+  const dockText = isLightMode ? "#111111" : "white";
+  const dockSubtle = isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
+
+  const arrowColor = isLightMode ? "#111111" : BRAND_GOLD;
+  const arrowBorder = isLightMode ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.14)";
+  const arrowBg = isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.06)";
 
   const setThreadMessages = (threadId: string, nextMessages: Message[]) => {
     setThreads((prev) =>
@@ -952,7 +1071,7 @@ export default function VisionWorkspace() {
       return;
     }
 
-    const updatedSlice = currentThread.messages
+    const updatedSlice: Message[] = currentThread.messages
       .slice(0, idx + 1)
       .map((m) => (m.id === messageId ? { ...m, content: clean } : m));
 
@@ -1004,11 +1123,6 @@ export default function VisionWorkspace() {
     } catch {}
   };
 
-  const closeVoiceOverlay = () => {
-    if (isListening) stopVoiceVision();
-    setShowVoiceOverlay(false);
-  };
-
   const openAuthGate = () => {
     setShowAuthGate(true);
   };
@@ -1058,9 +1172,8 @@ export default function VisionWorkspace() {
         (meta) => {
           const maybe = meta.followUps ?? null;
           if (maybe) {
-            const partialAssistant: Message = { ...assistantStub, content: currentText };
-            const partialHistory: Message[] = [...base, partialAssistant];
-            applyFollowUps(maybe, currentText, partialHistory, chatType);
+            const interimAssistant: Message = { ...assistantStub, content: currentText };
+            applyFollowUps(maybe, currentText, [...base, interimAssistant], chatType);
           }
         }
       );
@@ -1109,7 +1222,9 @@ export default function VisionWorkspace() {
 
   const setFeedback = (messageId: string, value: "up" | "down") => {
     if (!currentThread) return;
-    const next = messages.map((m) => (m.id === messageId ? { ...m, feedback: m.feedback === value ? null : value } : m));
+    const next: Message[] = messages.map((m) =>
+      m.id === messageId ? { ...m, feedback: m.feedback === value ? null : value } : m
+    );
     setThreadMessages(currentThread.id, next);
 
     const nextValue = next.find((m) => m.id === messageId)?.feedback ?? null;
@@ -1123,7 +1238,7 @@ export default function VisionWorkspace() {
     const idx = currentThread.messages.findIndex((m) => m.id === messageId);
     if (idx < 0) return;
 
-    const slice = currentThread.messages.slice(0, idx + 1);
+    const slice: Message[] = currentThread.messages.slice(0, idx + 1);
     const who = currentThread.chatType === "business" ? "Atlas" : "Aura";
 
     const t: Thread = {
@@ -1192,7 +1307,6 @@ export default function VisionWorkspace() {
       );
 
       const finalText = String(result.text || currentText || "Connection interrupted.").trim();
-
       const finalAssistant: Message = { id: newAssistantId, role: "assistant", content: finalText };
       const finalMsgs: Message[] = [...base, finalAssistant];
 
@@ -1204,8 +1318,7 @@ export default function VisionWorkspace() {
       showToast("Response regenerated");
       scheduleCloudSync(currentThread.id);
     } catch {
-      const failAssistant: Message = { ...assistantStub, content: "Connection interrupted." };
-      setThreadMessages(currentThread.id, [...base, failAssistant]);
+      setThreadMessages(currentThread.id, [...base, { ...assistantStub, content: "Connection interrupted." }]);
       clearFollowUps();
       showToast("Regenerate failed");
     } finally {
@@ -1214,27 +1327,59 @@ export default function VisionWorkspace() {
     }
   };
 
-  const arrowColor = isLightMode ? "#111111" : BRAND_GOLD;
-  const arrowBorder = isLightMode ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.14)";
-  const arrowBg = isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.06)";
+  const renameThreadStart = (t: Thread) => {
+    setRenamingThreadId(t.id);
+    setRenameDraft(t.title || (t.chatType === "business" ? "For Vendors" : "For Couples"));
+  };
 
-  const dockLeft = isNarrow ? 14 : isSidebarOpen && !mobileSidebar ? 312 : 14;
-  const dockTop = isNarrow ? undefined : 184;
-  const dockBottom = isNarrow ? 150 : undefined;
+  const renameThreadSave = () => {
+    if (!renamingThreadId) return;
+    const clean = String(renameDraft || "").trim();
+    if (!clean) {
+      showToast("Title cannot be empty");
+      return;
+    }
 
-  const showDock =
-    (followUpsDockEnabled && followUps.length > 0 && !loading && !editingId && !showAuthGate && !showVoiceOverlay) ||
-    (!followUpsDockEnabled && !showAuthGate && !showVoiceOverlay);
+    setThreads((prev) =>
+      prev
+        .map((t) => (t.id === renamingThreadId ? { ...t, title: clean, updatedAt: Date.now() } : t))
+        .slice()
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, MAX_RECENTS)
+    );
 
-  const dockTitle = chatType === "business" ? "Atlas ideas" : "Aura ideas";
+    scheduleCloudSync(renamingThreadId);
+    setRenamingThreadId(null);
+    setRenameDraft("");
+    showToast("Renamed");
+  };
 
-  const dockPanelBg = isLightMode ? "rgba(255,255,255,0.96)" : "rgba(14,14,14,0.86)";
-  const dockPanelBorder = isLightMode ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.12)";
-  const dockText = isLightMode ? "#111111" : "white";
-  const dockSubtle = isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
+  const renameThreadCancel = () => {
+    setRenamingThreadId(null);
+    setRenameDraft("");
+  };
+
+  const filteredThreads = useMemo(() => {
+    const q = sidebarQuery.trim().toLowerCase();
+    const sorted = threads.slice().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_RECENTS);
+    if (!q) return sorted;
+
+    return sorted.filter((t) => {
+      const title = String(t.title || "").toLowerCase();
+      const hitTitle = title.includes(q);
+      const hitMessages = t.messages?.some((m) => String(m.content || "").toLowerCase().includes(q));
+      return hitTitle || hitMessages;
+    });
+  }, [threads, sidebarQuery]);
+
+  // Final mounted guard, after hooks
+  if (!mounted) return <div className="h-screen w-full bg-[#070707]" />;
 
   return (
-    <div className={`h-screen w-full flex ${theme.bg} ${theme.text} overflow-hidden relative`} style={{ fontFamily: "var(--font-nunito)" }}>
+    <div
+      className={`h-screen w-full flex ${theme.bg} ${theme.text} overflow-hidden relative`}
+      style={{ fontFamily: "var(--font-nunito)" }}
+    >
       {/* Toast */}
       <AnimatePresence>
         {toast && (
@@ -1270,19 +1415,29 @@ export default function VisionWorkspace() {
         )}
       </AnimatePresence>
 
-      {/* FLOATING FOLLOW UPS DOCK (left, on off) */}
+      {/* FLOATING FOLLOW UPS DOCK, draggable */}
       <AnimatePresence>
         {showDock && (
           <motion.div
+            ref={dockRef}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
             className="fixed z-[160]"
             style={{
               left: dockLeft,
-              top: dockTop,
-              bottom: dockBottom,
+              top: baseDockTop,
               width: isNarrow ? 240 : 270,
+              y: dockY,
+            }}
+            drag="y"
+            dragMomentum={false}
+            dragElastic={0.06}
+            dragConstraints={{ top: dockConstraintTop, bottom: dockConstraintBottom }}
+            onDragEnd={() => {
+              const next = clamp(dockY.get(), dockConstraintTop, dockConstraintBottom);
+              setDockYSaved(next);
+              showToast("Position saved");
             }}
           >
             {followUpsDockOpen ? (
@@ -1294,7 +1449,11 @@ export default function VisionWorkspace() {
                   backdropFilter: "blur(10px)",
                 }}
               >
-                <div className="px-4 py-3 flex items-center justify-between gap-3 border-b" style={{ borderColor: dockPanelBorder }}>
+                <div
+                  className="px-4 py-3 flex items-center justify-between gap-3 border-b cursor-grab active:cursor-grabbing"
+                  style={{ borderColor: dockPanelBorder }}
+                  title="Drag up or down"
+                >
                   <div className="flex items-center gap-2 min-w-0">
                     <div
                       className="w-8 h-8 rounded-full border flex items-center justify-center shrink-0"
@@ -1396,7 +1555,7 @@ export default function VisionWorkspace() {
                 <button
                   type="button"
                   onClick={() => setFollowUpsDockOpen(true)}
-                  className="w-full rounded-full border px-4 py-3 flex items-center justify-between shadow-lg"
+                  className="w-full rounded-full border px-4 py-3 flex items-center justify-between shadow-lg cursor-grab active:cursor-grabbing"
                   style={{
                     background: dockPanelBg,
                     borderColor: dockPanelBorder,
@@ -1405,6 +1564,7 @@ export default function VisionWorkspace() {
                     fontFamily: "var(--font-nunito)",
                   }}
                   aria-label="Open suggestions"
+                  title="Drag up or down"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <Sparkles size={14} style={{ color: iconColor }} />
@@ -1444,7 +1604,12 @@ export default function VisionWorkspace() {
       {/* VOICE OVERLAY */}
       <AnimatePresence>
         {showVoiceOverlay && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-md p-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-md p-6"
+          >
             <div
               className="w-full max-w-md border p-10 rounded-[28px] text-center shadow-2xl relative"
               style={{
@@ -1452,21 +1617,22 @@ export default function VisionWorkspace() {
                 borderColor: isLightMode ? "rgba(0,0,0,0.15)" : `${BRAND_GOLD}33`,
               }}
             >
-              <button onClick={closeVoiceOverlay} className="absolute top-6 right-6 opacity-50 hover:opacity-100">
+              <button onClick={() => setShowVoiceOverlay(false)} className="absolute top-6 right-6 opacity-50 hover:opacity-100">
                 <X size={18} style={{ color: iconColor }} />
               </button>
 
-              <div className="w-14 h-14 rounded-full border flex items-center justify-center mx-auto mb-6" style={{ borderColor: isLightMode ? "rgba(0,0,0,0.25)" : `${BRAND_GOLD}66` }}>
+              <div
+                className="w-14 h-14 rounded-full border flex items-center justify-center mx-auto mb-6"
+                style={{ borderColor: isLightMode ? "rgba(0,0,0,0.25)" : `${BRAND_GOLD}66` }}
+              >
                 <Mic size={22} style={{ color: isLightMode ? "#3f3f3f" : BRAND_GOLD }} />
               </div>
 
-              <h3 className="text-[22px] uppercase tracking-[0.22em] mb-2" style={{ fontFamily: "var(--font-gilda)", color: isLightMode ? "#111111" : "white" }}>
-                {personaName} Voice
+              <h3 className="text-[22px] uppercase tracking-[0.22em] mb-3" style={{ fontFamily: "var(--font-gilda)", color: isLightMode ? "#111111" : "white" }}>
+                Voice
               </h3>
 
-              <p className={`text-[12px] leading-relaxed mb-8 ${theme.subtle}`}>
-                Speak naturally, your final phrases will appear in the main input.
-              </p>
+              <p className={`text-[12px] leading-relaxed mb-8 ${theme.subtle}`}>Speak naturally, your final phrases will appear in the main input.</p>
 
               {voiceError && (
                 <p className="text-[12px] mb-6" style={{ color: isLightMode ? "#8a2a2a" : "#ffb3b3" }}>
@@ -1490,7 +1656,7 @@ export default function VisionWorkspace() {
 
                 <button
                   onClick={() => {
-                    closeVoiceOverlay();
+                    setShowVoiceOverlay(false);
                     textareaRef.current?.focus();
                   }}
                   className="flex-1 py-3 rounded-full text-[11px] font-semibold tracking-[0.18em] uppercase transition-all"
@@ -1507,7 +1673,12 @@ export default function VisionWorkspace() {
       {/* AUTH GATE */}
       <AnimatePresence>
         {showAuthGate && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70 backdrop-blur-md p-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[210] flex items-center justify-center bg-black/70 backdrop-blur-md p-6"
+          >
             <div
               className="w-full max-w-lg border p-10 rounded-[28px] shadow-2xl relative"
               style={{
@@ -1644,7 +1815,7 @@ export default function VisionWorkspace() {
         )}
       </AnimatePresence>
 
-      {/* IMAGE LIGHTBOX, slider, filename */}
+      {/* IMAGE LIGHTBOX */}
       <AnimatePresence>
         {lightboxOpen && lightboxItems.length > 0 && (
           <motion.div
@@ -1779,24 +1950,46 @@ export default function VisionWorkspace() {
             New conversation
           </button>
 
-          <div className="mt-8 space-y-2">
-            {threads
-              .slice()
-              .sort((a, b) => b.updatedAt - a.updatedAt)
-              .slice(0, MAX_RECENTS)
-              .map((t) => {
+          {/* Search */}
+          <div className="mt-5">
+            <div
+              className="flex items-center gap-3 px-4 py-3 rounded-xl border"
+              style={{
+                borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.10)",
+                background: isLightMode ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.04)",
+              }}
+            >
+              <Search size={16} style={{ color: iconColor, opacity: 0.9 }} />
+              <input
+                value={sidebarQuery}
+                onChange={(e) => setSidebarQuery(e.target.value)}
+                placeholder="Search chats"
+                className="w-full bg-transparent outline-none text-[12px]"
+                style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#111111" : "white" }}
+              />
+              {sidebarQuery.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setSidebarQuery("")}
+                  className="opacity-70 hover:opacity-100"
+                  aria-label="Clear search"
+                >
+                  <X size={16} style={{ color: iconColor }} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-2">
+            {filteredThreads.length ? (
+              filteredThreads.map((t) => {
                 const active = t.id === activeThreadId;
+                const isRenaming = renamingThreadId === t.id;
+
                 return (
-                  <button
+                  <div
                     key={t.id}
-                    onClick={() => {
-                      clearFollowUps();
-                      cancelEdit();
-                      setActiveThreadId(t.id);
-                      setChatType(t.chatType);
-                      if (mobileSidebar) setIsSidebarOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-3 rounded-xl border transition-all"
+                    className="w-full px-4 py-3 rounded-xl border transition-all"
                     style={{
                       borderColor: active
                         ? isLightMode
@@ -1808,15 +2001,108 @@ export default function VisionWorkspace() {
                       background: active ? (isLightMode ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.04)") : "transparent",
                     }}
                   >
-                    <div className="text-[12px] font-semibold truncate" style={{ fontFamily: "var(--font-nunito)" }}>
-                      {t.title || (t.chatType === "business" ? "For Vendors" : "For Couples")}
-                    </div>
-                    <div className="text-[11px] opacity-60 mt-1" style={{ fontFamily: "var(--font-nunito)" }}>
-                      {t.chatType === "business" ? "Atlas" : "Aura"}
-                    </div>
-                  </button>
+                    <button
+                      onClick={() => {
+                        clearFollowUps();
+                        cancelEdit();
+                        setActiveThreadId(t.id);
+                        setChatType(t.chatType);
+                        if (mobileSidebar) setIsSidebarOpen(false);
+                      }}
+                      className="w-full text-left"
+                      aria-label="Open chat"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          {isRenaming ? (
+                            <input
+                              ref={renameInputRef}
+                              value={renameDraft}
+                              onChange={(e) => setRenameDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  renameThreadSave();
+                                }
+                                if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  renameThreadCancel();
+                                }
+                              }}
+                              className="w-full bg-transparent outline-none text-[12px] font-semibold"
+                              style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#111111" : "white" }}
+                            />
+                          ) : (
+                            <div className="text-[12px] font-semibold truncate" style={{ fontFamily: "var(--font-nunito)" }}>
+                              {t.title || (t.chatType === "business" ? "For Vendors" : "For Couples")}
+                            </div>
+                          )}
+
+                          <div className="text-[11px] opacity-60 mt-1" style={{ fontFamily: "var(--font-nunito)" }}>
+                            {t.chatType === "business" ? "Atlas" : "Aura"}
+                            <span className="mx-2" style={{ opacity: 0.45 }}>
+                              ·
+                            </span>
+                            <span style={{ opacity: 0.8 }}>{formatThreadTsUTC(t.updatedAt)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isRenaming ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  renameThreadSave();
+                                }}
+                                className="opacity-80 hover:opacity-100"
+                                aria-label="Save title"
+                                title="Save"
+                              >
+                                <Check size={16} style={{ color: iconColor }} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  renameThreadCancel();
+                                }}
+                                className="opacity-80 hover:opacity-100"
+                                aria-label="Cancel rename"
+                                title="Cancel"
+                              >
+                                <X size={16} style={{ color: iconColor }} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                renameThreadStart(t);
+                              }}
+                              className="opacity-75 hover:opacity-100"
+                              aria-label="Rename chat"
+                              title="Rename"
+                            >
+                              <Pencil size={15} style={{ color: iconColor }} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
                 );
-              })}
+              })
+            ) : (
+              <div className="text-[12px] opacity-60" style={{ fontFamily: "var(--font-nunito)" }}>
+                No results
+              </div>
+            )}
           </div>
 
           <div className="mt-auto pt-10">
@@ -1875,7 +2161,11 @@ export default function VisionWorkspace() {
 
               <div className="flex items-center gap-5 justify-end">
                 <button onClick={() => setIsProjectionOpen(!isProjectionOpen)} aria-label="Toggle projection" className="hidden md:inline-flex">
-                  {isProjectionOpen ? <PanelRightClose size={22} style={{ color: iconColor }} /> : <PanelRightOpen size={22} style={{ color: iconColor }} />}
+                  {isProjectionOpen ? (
+                    <PanelRightClose size={22} style={{ color: iconColor }} />
+                  ) : (
+                    <PanelRightOpen size={22} style={{ color: iconColor }} />
+                  )}
                 </button>
 
                 <button onClick={() => setIsLightMode(!isLightMode)} aria-label="Toggle theme" className="opacity-90 hover:opacity-100">
@@ -1925,10 +2215,7 @@ export default function VisionWorkspace() {
 
           <div className="w-full px-6 md:px-12 pt-7 pb-7">
             <div className="text-center">
-              <h1
-                className="text-[22px] md:text-[34px] uppercase leading-none tracking-tight"
-                style={{ fontFamily: "var(--font-gilda)", color: isLightMode ? "#111111" : "white" }}
-              >
+              <h1 className="text-[22px] md:text-[34px] uppercase leading-none tracking-tight" style={{ fontFamily: "var(--font-gilda)", color: isLightMode ? "#111111" : "white" }}>
                 5 STAR WEDDINGS
               </h1>
               <h2 className="text-[9px] md:text-[11px] uppercase tracking-[0.55em] mt-1" style={{ fontFamily: "var(--font-gilda)", color: BRAND_GOLD }}>
@@ -1938,440 +2225,481 @@ export default function VisionWorkspace() {
           </div>
         </header>
 
+        {/* BODY */}
         <div className="flex-1 flex overflow-hidden">
-          {/* CHAT */}
-          <main ref={scrollRef} className="flex-1 overflow-y-auto px-6 md:px-12 py-4 border-r border-white/0">
-            <div className="max-w-3xl mx-auto space-y-8 pb-[200px] pt-6">
-              {/* Persona switcher */}
-              <div className="flex justify-center mb-10">
-                <div
-                  className="flex p-1 rounded-full border backdrop-blur-md w-full max-w-md shadow-xl"
-                  style={{
-                    borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.10)",
-                    background: isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)",
-                  }}
-                >
-                  <button
-                    onClick={() => handleToggle("business")}
-                    className="flex-1 py-3 rounded-full text-[10px] font-semibold uppercase transition-all"
+          {/* CHAT COLUMN, footer is inside this column only */}
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0 border-r border-white/0">
+            <main ref={scrollRef} className="flex-1 overflow-y-auto px-6 md:px-12 py-4">
+              <div className="max-w-3xl mx-auto space-y-8 pb-10 pt-6">
+                {/* Persona switcher */}
+                <div className="flex justify-center mb-10">
+                  <div
+                    className="flex p-1 rounded-full border backdrop-blur-md w-full max-w-md shadow-xl"
                     style={{
-                      fontFamily: "var(--font-nunito)",
-                      letterSpacing: "0.18em",
-                      background: chatType === "business" ? BRAND_GOLD : "transparent",
-                      color: chatType === "business" ? "#111111" : isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
+                      borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.10)",
+                      background: isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)",
                     }}
                   >
-                    For Vendors
-                  </button>
-                  <button
-                    onClick={() => handleToggle("couple")}
-                    className="flex-1 py-3 rounded-full text-[10px] font-semibold uppercase transition-all"
-                    style={{
-                      fontFamily: "var(--font-nunito)",
-                      letterSpacing: "0.18em",
-                      background: chatType === "couple" ? "rgba(24,63,52,0.95)" : "transparent",
-                      color: chatType === "couple" ? "white" : isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
-                    }}
-                  >
-                    For Couples
-                  </button>
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {messages.map((m) => {
-                  const isUser = m.role === "user";
-                  const isEditingThis = isUser && editingId === m.id;
-
-                  const bubbleBg = isUser ? "rgba(24,63,52,0.95)" : isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)";
-                  const bubbleBorder = isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)";
-
-                  return (
-                    <motion.div key={m.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className={`flex gap-5 ${isUser ? "flex-row-reverse" : ""}`} style={{ willChange: "transform, opacity" }}>
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 mt-1" style={{ borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)" }}>
-                        {isUser ? <User size={16} style={{ color: iconColor }} /> : <Sparkles size={16} style={{ color: iconColor }} />}
-                      </div>
-
-                      <div className="max-w-[76%]">
-                        <div
-                          className="px-6 py-4 rounded-[22px] shadow-sm border"
-                          style={{
-                            background: bubbleBg,
-                            borderColor: bubbleBorder,
-                            color: isUser ? "white" : isLightMode ? "#111111" : "white",
-                            fontFamily: "var(--font-nunito)",
-                            fontSize: "16px",
-                            lineHeight: "1.55",
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          {isEditingThis ? (
-                            <textarea
-                              value={editDraft}
-                              onChange={(e) => setEditDraft(e.target.value)}
-                              className="w-full bg-transparent outline-none resize-none"
-                              style={{ fontFamily: "var(--font-nunito)", fontSize: 16, lineHeight: "1.55", color: "inherit", minHeight: 80 }}
-                            />
-                          ) : (
-                            m.content
-                          )}
-                        </div>
-
-                        {/* Actions */}
-                        <div className="mt-3 flex items-center gap-4">
-                          {isUser ? (
-                            <>
-                              {isEditingThis ? (
-                                <>
-                                  <button onClick={() => saveEdit(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Save" title="Save">
-                                    <Check size={16} style={{ color: actionIconColor }} />
-                                  </button>
-
-                                  <button onClick={cancelEdit} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Cancel" title="Cancel">
-                                    <X size={16} style={{ color: actionIconColor }} />
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button onClick={() => startEdit(m.id, m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Edit" title="Edit">
-                                    <Pencil size={16} style={{ color: actionIconColor }} />
-                                  </button>
-
-                                  <button onClick={() => branchFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Branch" title="Branch">
-                                    <GitBranch size={16} style={{ color: actionIconColor }} />
-                                  </button>
-                                </>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <button onClick={() => onCopy(m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Copy" title="Copy">
-                                <Copy size={16} style={{ color: actionIconColor }} />
-                              </button>
-
-                              <button onClick={() => onShare(m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Share" title="Share">
-                                <Share2 size={16} style={{ color: actionIconColor }} />
-                              </button>
-
-                              <button onClick={() => setFeedback(m.id, "up")} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Like" title="Like">
-                                <ThumbsUp
-                                  size={16}
-                                  style={{
-                                    color: m.feedback === "up" ? (isLightMode ? "#111111" : BRAND_GOLD) : actionIconColor,
-                                  }}
-                                />
-                              </button>
-
-                              <button onClick={() => setFeedback(m.id, "down")} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Dislike" title="Dislike">
-                                <ThumbsDown
-                                  size={16}
-                                  style={{
-                                    color: m.feedback === "down" ? (isLightMode ? "#111111" : BRAND_GOLD) : actionIconColor,
-                                  }}
-                                />
-                              </button>
-
-                              <button onClick={() => branchFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Branch" title="Branch">
-                                <GitBranch size={16} style={{ color: actionIconColor }} />
-                              </button>
-
-                              <button onClick={() => regenerateFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Regenerate" title="Regenerate" disabled={loading}>
-                                <RefreshCcw size={16} style={{ color: actionIconColor }} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-
-              <AnimatePresence>
-                {loading && !hasStreamedAny && (
-                  <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="flex gap-5">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 mt-1" style={{ borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)" }}>
-                      <Sparkles size={16} style={{ color: iconColor }} />
-                    </div>
-
-                    <div
-                      className="px-6 py-4 rounded-[22px] shadow-sm border"
+                    <button
+                      onClick={() => handleToggle("business")}
+                      className="flex-1 py-3 rounded-full text-[10px] font-semibold uppercase transition-all"
                       style={{
-                        background: isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)",
-                        borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)",
                         fontFamily: "var(--font-nunito)",
-                        fontSize: "16px",
-                        lineHeight: "1.55",
+                        letterSpacing: "0.18em",
+                        background: chatType === "business" ? BRAND_GOLD : "transparent",
+                        color: chatType === "business" ? "#111111" : isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
                       }}
                     >
-                      {chatType === "business" ? "Atlas is thinking" : "Aura is thinking"}
-                      <span className="inline-block ml-2">
-                        <span className="animate-pulse">.</span>
-                        <span className="animate-pulse">.</span>
-                        <span className="animate-pulse">.</span>
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </main>
+                      For Vendors
+                    </button>
+                    <button
+                      onClick={() => handleToggle("couple")}
+                      className="flex-1 py-3 rounded-full text-[10px] font-semibold uppercase transition-all"
+                      style={{
+                        fontFamily: "var(--font-nunito)",
+                        letterSpacing: "0.18em",
+                        background: chatType === "couple" ? "rgba(24,63,52,0.95)" : "transparent",
+                        color: chatType === "couple" ? "white" : isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
+                      }}
+                    >
+                      For Couples
+                    </button>
+                  </div>
+                </div>
 
-          {/* PROJECTION CANVAS */}
+                <AnimatePresence>
+                  {messages.map((m) => {
+                    const isUser = m.role === "user";
+                    const isEditingThis = isUser && editingId === m.id;
+
+                    const bubbleBg = isUser ? "rgba(24,63,52,0.95)" : isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)";
+                    const bubbleBorder = isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)";
+
+                    return (
+                      <motion.div
+                        key={m.id}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex gap-5 ${isUser ? "flex-row-reverse" : ""}`}
+                        style={{ willChange: "transform, opacity" }}
+                      >
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 mt-1" style={{ borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)" }}>
+                          {isUser ? <User size={16} style={{ color: iconColor }} /> : <Sparkles size={16} style={{ color: iconColor }} />}
+                        </div>
+
+                        <div className="max-w-[76%]">
+                          <div
+                            className="px-6 py-4 rounded-[22px] shadow-sm border"
+                            style={{
+                              background: bubbleBg,
+                              borderColor: bubbleBorder,
+                              color: isUser ? "white" : isLightMode ? "#111111" : "white",
+                              fontFamily: "var(--font-nunito)",
+                              fontSize: "16px",
+                              lineHeight: "1.55",
+                              whiteSpace: "pre-wrap",
+                            }}
+                          >
+                            {isEditingThis ? (
+                              <textarea
+                                value={editDraft}
+                                onChange={(e) => setEditDraft(e.target.value)}
+                                className="w-full bg-transparent outline-none resize-none"
+                                style={{ fontFamily: "var(--font-nunito)", fontSize: 16, lineHeight: "1.55", color: "inherit", minHeight: 80 }}
+                              />
+                            ) : (
+                              m.content
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="mt-3 flex items-center gap-4">
+                            {isUser ? (
+                              <>
+                                {isEditingThis ? (
+                                  <>
+                                    <button onClick={() => saveEdit(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Save" title="Save">
+                                      <Check size={16} style={{ color: actionIconColor }} />
+                                    </button>
+
+                                    <button onClick={cancelEdit} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Cancel" title="Cancel">
+                                      <X size={16} style={{ color: actionIconColor }} />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button onClick={() => startEdit(m.id, m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Edit" title="Edit">
+                                      <Pencil size={16} style={{ color: actionIconColor }} />
+                                    </button>
+
+                                    <button onClick={() => branchFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Branch" title="Branch">
+                                      <GitBranch size={16} style={{ color: actionIconColor }} />
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => onCopy(m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Copy" title="Copy">
+                                  <Copy size={16} style={{ color: actionIconColor }} />
+                                </button>
+
+                                <button onClick={() => onShare(m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Share" title="Share">
+                                  <Share2 size={16} style={{ color: actionIconColor }} />
+                                </button>
+
+                                <button onClick={() => setFeedback(m.id, "up")} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Like" title="Like">
+                                  <ThumbsUp
+                                    size={16}
+                                    style={{
+                                      color: m.feedback === "up" ? (isLightMode ? "#111111" : BRAND_GOLD) : actionIconColor,
+                                    }}
+                                  />
+                                </button>
+
+                                <button onClick={() => setFeedback(m.id, "down")} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Dislike" title="Dislike">
+                                  <ThumbsDown
+                                    size={16}
+                                    style={{
+                                      color: m.feedback === "down" ? (isLightMode ? "#111111" : BRAND_GOLD) : actionIconColor,
+                                    }}
+                                  />
+                                </button>
+
+                                <button onClick={() => branchFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Branch" title="Branch">
+                                  <GitBranch size={16} style={{ color: actionIconColor }} />
+                                </button>
+
+                                <button onClick={() => regenerateFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Regenerate" title="Regenerate" disabled={loading}>
+                                  <RefreshCcw size={16} style={{ color: actionIconColor }} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {loading && !hasStreamedAny && (
+                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="flex gap-5">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 mt-1" style={{ borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)" }}>
+                        <Sparkles size={16} style={{ color: iconColor }} />
+                      </div>
+
+                      <div
+                        className="px-6 py-4 rounded-[22px] shadow-sm border"
+                        style={{
+                          background: isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)",
+                          borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)",
+                          fontFamily: "var(--font-nunito)",
+                          fontSize: "16px",
+                          lineHeight: "1.55",
+                        }}
+                      >
+                        {chatType === "business" ? "Atlas is thinking" : "Aura is thinking"}
+                        <span className="inline-block ml-2">
+                          <span className="animate-pulse">.</span>
+                          <span className="animate-pulse">.</span>
+                          <span className="animate-pulse">.</span>
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </main>
+
+            {/* INPUT + FOOTER, inside chat column only */}
+            <footer className="shrink-0 pb-10 pt-6">
+              <div className="max-w-3xl mx-auto px-6 md:px-12">
+                {showRegisterNudge && !showAuthGate && (
+                  <div
+                    className="mb-4 rounded-2xl border px-4 py-3 text-[12px] flex items-center justify-between gap-3"
+                    style={{
+                      borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.10)",
+                      background: isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)",
+                      color: isLightMode ? "#111111" : "white",
+                      fontFamily: "var(--font-nunito)",
+                    }}
+                  >
+                    <span>Register to save your conversation and continue.</span>
+                    <button onClick={() => setShowRegisterChooser(true)} className="underline underline-offset-4" style={{ color: isLightMode ? "#111111" : "white" }}>
+                      Register
+                    </button>
+                  </div>
+                )}
+
+                <div
+                  className="rounded-[34px] border flex items-center gap-4 px-5 py-3 shadow-sm"
+                  style={{
+                    background: isLightMode ? "rgba(255,255,255,0.98)" : "rgba(18,18,18,0.80)",
+                    borderColor: isLightMode ? "rgba(0,0,0,0.35)" : `${BRAND_GOLD}66`,
+                  }}
+                >
+                  <button onClick={() => setShowVoiceOverlay(true)} className="opacity-90 hover:opacity-100 transition-opacity" aria-label="Voice">
+                    <Mic size={18} style={{ color: isLightMode ? "#3f3f3f" : BRAND_GOLD }} />
+                  </button>
+
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      if (followUps.length) clearFollowUps();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder={chatType === "business" ? "Tell Atlas what you want to achieve." : "Tell Aura what you are creating."}
+                    className="flex-1 bg-transparent outline-none resize-none leading-[1.4] pt-[2px]"
+                    style={{ height: 44, fontFamily: "var(--font-nunito)", fontSize: 16, color: isLightMode ? "#111111" : "white" }}
+                  />
+
+                  <button
+                    onClick={handleSend}
+                    className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95"
+                    style={{ background: BRAND_GOLD }}
+                    aria-label="Send"
+                  >
+                    <ArrowUp size={20} style={{ color: "#111111" }} />
+                  </button>
+                </div>
+
+                <div
+                  className="mt-7 text-[12px] text-center"
+                  style={{
+                    fontFamily: "var(--font-nunito)",
+                    color: isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.50)",
+                  }}
+                >
+                  © 2026 5 Star Weddings, Concierge Platform. Powered by Taigenic.ai ·{" "}
+                  <a href="/cookie-preferences" className="underline underline-offset-4">
+                    Cookie Preferences
+                  </a>
+                </div>
+              </div>
+            </footer>
+          </div>
+
+          {/* PROJECTION CANVAS, sticky header, scroll under */}
           <AnimatePresence>
             {isProjectionOpen && (
               <motion.aside
                 initial={{ width: 0, opacity: 0 }}
                 animate={{ width: "40%", opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
-                className="hidden lg:flex flex-col p-10 gap-8 overflow-y-auto border-l"
+                className="hidden lg:flex flex-col overflow-hidden border-l"
                 style={{
                   borderColor: isLightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)",
                   background: isLightMode ? "#ffffff" : "#070707",
                   fontFamily: "var(--font-nunito)",
                 }}
               >
-                <div className="flex items-center justify-between px-2">
-                  <h3
-                    className="text-[10px] font-semibold uppercase tracking-[0.5em] opacity-60"
-                    style={{
-                      fontFamily: "var(--font-nunito)",
-                      color: isLightMode ? "#6b6b6b" : "rgba(255,255,255,0.55)",
-                    }}
-                  >
-                    Projection Canvas
-                  </h3>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowGallery((v) => !v)}
-                      className="px-3 h-9 rounded-full border text-[10px] font-semibold uppercase tracking-[0.22em] opacity-90 hover:opacity-100"
-                      aria-label="Toggle gallery"
+                {/* Sticky header */}
+                <div
+                  className="sticky top-0 z-20 px-10 pt-10 pb-7"
+                  style={{
+                    background: isLightMode ? "rgba(255,255,255,0.92)" : "rgba(7,7,7,0.88)",
+                    backdropFilter: "blur(10px)",
+                    borderBottom: `1px solid ${isLightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)"}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between px-2 relative">
+                    <h3
+                      className="text-[10px] font-semibold uppercase tracking-[0.5em] opacity-60"
                       style={{
                         fontFamily: "var(--font-nunito)",
-                        borderColor: arrowBorder,
-                        background: showGallery ? arrowBg : "transparent",
-                        color: isLightMode ? "#111111" : "white",
+                        color: isLightMode ? "#6b6b6b" : "rgba(255,255,255,0.55)",
                       }}
                     >
-                      Gallery
-                    </button>
+                      Projection Canvas
+                    </h3>
 
-                    <button
-                      type="button"
-                      onClick={() => scrollCarousel("left")}
-                      disabled={!showGallery}
-                      className="w-9 h-9 rounded-full border flex items-center justify-center transition-opacity"
-                      aria-label="Scroll left"
-                      style={{
-                        borderColor: arrowBorder,
-                        background: arrowBg,
-                        color: arrowColor,
-                        opacity: showGallery ? 0.9 : 0.35,
-                      }}
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowGallery((v) => !v)}
+                        className="px-3 h-9 rounded-full border text-[10px] font-semibold uppercase tracking-[0.22em] opacity-90 hover:opacity-100"
+                        aria-label="Toggle gallery"
+                        style={{
+                          fontFamily: "var(--font-nunito)",
+                          borderColor: arrowBorder,
+                          background: showGallery ? arrowBg : "transparent",
+                          color: isLightMode ? "#111111" : "white",
+                        }}
+                      >
+                        Gallery
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => scrollCarousel("right")}
-                      disabled={!showGallery}
-                      className="w-9 h-9 rounded-full border flex items-center justify-center transition-opacity"
-                      aria-label="Scroll right"
-                      style={{
-                        borderColor: arrowBorder,
-                        background: arrowBg,
-                        color: arrowColor,
-                        opacity: showGallery ? 0.9 : 0.35,
-                      }}
-                    >
-                      <ChevronRight size={16} />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => scrollCarousel("left")}
+                        disabled={!showGallery}
+                        className="w-9 h-9 rounded-full border flex items-center justify-center transition-opacity"
+                        aria-label="Scroll left"
+                        style={{
+                          borderColor: arrowBorder,
+                          background: arrowBg,
+                          color: arrowColor,
+                          opacity: showGallery ? 0.9 : 0.35,
+                        }}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => scrollCarousel("right")}
+                        disabled={!showGallery}
+                        className="w-9 h-9 rounded-full border flex items-center justify-center transition-opacity"
+                        aria-label="Scroll right"
+                        style={{
+                          borderColor: arrowBorder,
+                          background: arrowBg,
+                          color: arrowColor,
+                          opacity: showGallery ? 0.9 : 0.35,
+                        }}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* subtle fade */}
+                  <div
+                    className="absolute left-0 right-0 bottom-0 h-6 pointer-events-none"
+                    style={{
+                      background: isLightMode
+                        ? "linear-gradient(to bottom, rgba(255,255,255,0.0), rgba(255,255,255,0.92))"
+                        : "linear-gradient(to bottom, rgba(7,7,7,0.0), rgba(7,7,7,0.88))",
+                      transform: "translateY(24px)",
+                    }}
+                  />
                 </div>
 
-                {/* Smart cards */}
-                <div className="px-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    {projection.cards.map((c) => (
+                {/* Scrollable content */}
+                <div className="flex-1 overflow-y-auto px-10 pb-10 pt-7">
+                  <div className="px-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      {projection.cards.map((c) => (
+                        <div
+                          key={c.k}
+                          className="rounded-[18px] border p-4"
+                          style={{
+                            borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)",
+                            background: isLightMode ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.03)",
+                          }}
+                        >
+                          <div className="text-[10px] uppercase tracking-[0.28em] opacity-70" style={{ fontFamily: "var(--font-nunito)" }}>
+                            {c.k}
+                          </div>
+                          <div className="mt-2 text-[14px]" style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#111111" : "white", lineHeight: 1.35 }}>
+                            {c.v}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {projection.tags.length > 0 && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {projection.tags.map((t) => (
+                          <div
+                            key={t}
+                            className="px-3 py-1 rounded-full border text-[11px]"
+                            style={{
+                              fontFamily: "var(--font-nunito)",
+                              borderColor: isLightMode ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.12)",
+                              background: isLightMode ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.04)",
+                              color: isLightMode ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.85)",
+                            }}
+                          >
+                            {t}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {projection.next.length > 0 && (
                       <div
-                        key={c.k}
-                        className="rounded-[18px] border p-4"
+                        className="mt-5 rounded-[20px] border p-5"
                         style={{
                           borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)",
                           background: isLightMode ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.03)",
                         }}
                       >
                         <div className="text-[10px] uppercase tracking-[0.28em] opacity-70" style={{ fontFamily: "var(--font-nunito)" }}>
-                          {c.k}
+                          Next steps
                         </div>
-                        <div className="mt-2 text-[14px]" style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#111111" : "white", lineHeight: 1.35 }}>
-                          {c.v}
+                        <div className="mt-3 space-y-2">
+                          {projection.next.map((n) => (
+                            <div
+                              key={n}
+                              className="text-[12px] leading-relaxed"
+                              style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "rgba(0,0,0,0.80)" : "rgba(255,255,255,0.88)" }}
+                            >
+                              {n}
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
 
-                  {projection.tags.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {projection.tags.map((t) => (
-                        <div
-                          key={t}
-                          className="px-3 py-1 rounded-full border text-[11px]"
-                          style={{
-                            fontFamily: "var(--font-nunito)",
-                            borderColor: isLightMode ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.12)",
-                            background: isLightMode ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.04)",
-                            color: isLightMode ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.85)",
-                          }}
+                  {/* 2 up carousel, click opens slider */}
+                  {showGallery && (
+                    <div ref={carouselRef} className="flex gap-6 overflow-x-auto px-2 pb-2 mt-8" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+                      {(chatType === "couple" ? auraGallery : atlasGallery).map((item, idx) => (
+                        <button
+                          key={item.url}
+                          type="button"
+                          onClick={() => openLightbox(chatType === "couple" ? auraGallery : atlasGallery, idx)}
+                          className="shrink-0 text-left"
+                          style={{ width: "calc((100% - 24px) / 2)", scrollSnapAlign: "start" }}
+                          aria-label="Open image"
                         >
-                          {t}
-                        </div>
+                          <motion.div
+                            whileHover={{ scale: 1.01 }}
+                            className="aspect-[4/5] rounded-[26px] overflow-hidden relative border shadow-sm"
+                            style={{ borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)" }}
+                          >
+                            <img
+                              src={item.url}
+                              alt={item.label}
+                              className="object-cover w-full h-full"
+                              loading="lazy"
+                              onError={(e) => {
+                                const el = e.currentTarget;
+                                el.style.display = "none";
+                                const parent = el.parentElement;
+                                if (parent) {
+                                  parent.style.background = isLightMode ? "linear-gradient(180deg,#f2f2f2,#e6e6e6)" : "linear-gradient(180deg,#111,#0b0b0b)";
+                                }
+                              }}
+                            />
+                            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)" }} />
+                            <div
+                              className="absolute left-4 right-4 bottom-4 text-[11px] truncate"
+                              style={{ fontFamily: "var(--font-nunito)", color: "rgba(255,255,255,0.90)" }}
+                              title={item.label}
+                            >
+                              {item.label}
+                            </div>
+                          </motion.div>
+                        </button>
                       ))}
                     </div>
                   )}
-
-                  {projection.next.length > 0 && (
-                    <div
-                      className="mt-5 rounded-[20px] border p-5"
-                      style={{
-                        borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)",
-                        background: isLightMode ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.03)",
-                      }}
-                    >
-                      <div className="text-[10px] uppercase tracking-[0.28em] opacity-70" style={{ fontFamily: "var(--font-nunito)" }}>
-                        Next steps
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        {projection.next.map((n) => (
-                          <div key={n} className="text-[12px] leading-relaxed" style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "rgba(0,0,0,0.80)" : "rgba(255,255,255,0.88)" }}>
-                            {n}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
-
-                {/* 2 up carousel, click opens slider */}
-                {showGallery && (
-                  <div ref={carouselRef} className="flex gap-6 overflow-x-auto px-2 pb-2" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
-                    {(chatType === "couple" ? auraGallery : atlasGallery).map((item, idx) => (
-                      <button
-                        key={item.url}
-                        type="button"
-                        onClick={() => openLightbox(chatType === "couple" ? auraGallery : atlasGallery, idx)}
-                        className="shrink-0 text-left"
-                        style={{ width: "calc((100% - 24px) / 2)", scrollSnapAlign: "start" }}
-                        aria-label="Open image"
-                      >
-                        <motion.div
-                          whileHover={{ scale: 1.01 }}
-                          className="aspect-[4/5] rounded-[26px] overflow-hidden relative border shadow-sm"
-                          style={{ borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)" }}
-                        >
-                          <img
-                            src={item.url}
-                            alt={item.label}
-                            className="object-cover w-full h-full"
-                            loading="lazy"
-                            onError={(e) => {
-                              const el = e.currentTarget;
-                              el.style.display = "none";
-                              const parent = el.parentElement;
-                              if (parent) {
-                                parent.style.background = isLightMode ? "linear-gradient(180deg,#f2f2f2,#e6e6e6)" : "linear-gradient(180deg,#111,#0b0b0b)";
-                              }
-                            }}
-                          />
-                          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)" }} />
-                          <div
-                            className="absolute left-4 right-4 bottom-4 text-[11px] truncate"
-                            style={{ fontFamily: "var(--font-nunito)", color: "rgba(255,255,255,0.90)" }}
-                            title={item.label}
-                          >
-                            {item.label}
-                          </div>
-                        </motion.div>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </motion.aside>
             )}
           </AnimatePresence>
         </div>
-
-        {/* INPUT + FOOTER */}
-        <footer className="absolute bottom-0 left-0 w-full pb-10 pt-10">
-          <div className="max-w-3xl mx-auto px-6 md:px-12">
-            {showRegisterNudge && !showAuthGate && (
-              <div
-                className="mb-4 rounded-2xl border px-4 py-3 text-[12px] flex items-center justify-between gap-3"
-                style={{
-                  borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.10)",
-                  background: isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)",
-                  color: isLightMode ? "#111111" : "white",
-                  fontFamily: "var(--font-nunito)",
-                }}
-              >
-                <span>Register to save your conversation and continue.</span>
-                <button onClick={() => setShowRegisterChooser(true)} className="underline underline-offset-4" style={{ color: isLightMode ? "#111111" : "white" }}>
-                  Register
-                </button>
-              </div>
-            )}
-
-            <div
-              className="rounded-[34px] border flex items-center gap-4 px-5 py-3 shadow-sm"
-              style={{
-                background: isLightMode ? "rgba(255,255,255,0.98)" : "rgba(18,18,18,0.80)",
-                borderColor: isLightMode ? "rgba(0,0,0,0.35)" : `${BRAND_GOLD}66`,
-              }}
-            >
-              <button onClick={() => setShowVoiceOverlay(true)} className="opacity-90 hover:opacity-100 transition-opacity" aria-label="Voice">
-                <Mic size={18} style={{ color: isLightMode ? "#3f3f3f" : BRAND_GOLD }} />
-              </button>
-
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  if (followUps.length) clearFollowUps();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder={chatType === "business" ? "Tell Atlas what you want to achieve." : "Tell Aura what you are creating."}
-                className="flex-1 bg-transparent outline-none resize-none leading-[1.4] pt-[2px]"
-                style={{ height: 44, fontFamily: "var(--font-nunito)", fontSize: 16, color: isLightMode ? "#111111" : "white" }}
-              />
-
-              <button onClick={handleSend} className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95" style={{ background: BRAND_GOLD }} aria-label="Send">
-                <ArrowUp size={20} style={{ color: "#111111" }} />
-              </button>
-            </div>
-
-            <div
-              className="mt-7 text-[12px] text-center"
-              style={{
-                fontFamily: "var(--font-nunito)",
-                color: isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.50)",
-              }}
-            >
-              © 2026 5 Star Weddings, Concierge Platform. Powered by Taigenic.ai ·{" "}
-              <a href="/cookie-preferences" className="underline underline-offset-4">
-                Cookie Preferences
-              </a>
-            </div>
-          </div>
-        </footer>
       </div>
     </div>
   );

@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  MessageSquare,
 } from "lucide-react";
 
 type ChatRole = "user" | "assistant";
@@ -54,6 +55,8 @@ type GalleryItem = {
   label: string;
 };
 
+type GalleryCommentMap = Record<string, string[]>;
+
 const STORAGE_KEY = "taigenic_vision_threads_v1";
 const MAX_RECENTS = 4;
 
@@ -75,6 +78,9 @@ const FOLLOWUPS_PREF_KEY = "taigenic_vision_followups_dock_on_v1";
 
 /* Follow ups dock Y position */
 const FOLLOWUPS_DOCK_Y_KEY = "taigenic_vision_followups_dock_y_v1";
+
+/* Gallery comments */
+const GALLERY_COMMENTS_KEY = "taigenic_gallery_comments_v1";
 
 function gateDismissedRecently() {
   if (typeof window === "undefined") return false;
@@ -105,7 +111,7 @@ function clamp(n: number, min: number, max: number) {
 
 function formatThreadTsUTC(ts: number) {
   try {
-    const iso = new Date(ts).toISOString(); // stable, UTC
+    const iso = new Date(ts).toISOString();
     return iso.slice(0, 16).replace("T", " ");
   } catch {
     return "";
@@ -441,16 +447,33 @@ export default function VisionWorkspace() {
   const [lightboxItems, setLightboxItems] = useState<GalleryItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
+  // Gallery comments
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentTarget, setCommentTarget] = useState<GalleryItem | null>(null);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [galleryComments, setGalleryComments] = useState<GalleryCommentMap>({});
+
+  // Projection scroll shadow
+  const projectionScrollRef = useRef<HTMLDivElement | null>(null);
+  const [projectionScrolled, setProjectionScrolled] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Cloud sync debounce
   const syncTimerRef = useRef<number | null>(null);
+  const threadsRef = useRef<Thread[]>([]);
+
+  useEffect(() => {
+    threadsRef.current = threads;
+  }, [threads]);
 
   const showToast = (msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2200);
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => setToast(null), 2200);
+    }
   };
 
   const clearFollowUps = () => setFollowUps([]);
@@ -642,14 +665,14 @@ export default function VisionWorkspace() {
     };
   }, [messages, chatType, followUps]);
 
-  const scheduleCloudSync = (threadId: string) => {
+  const scheduleCloudSync = (threadId: string, snapshot?: Thread) => {
     if (!mounted) return;
     if (!isAuthed) return;
 
     if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
     syncTimerRef.current = window.setTimeout(async () => {
       try {
-        const t = threads.find((x) => x.id === threadId);
+        const t = snapshot ?? threadsRef.current.find((x) => x.id === threadId);
         if (!t) return;
 
         await fetch("/api/vision/sync", {
@@ -714,6 +737,70 @@ export default function VisionWorkspace() {
       const next = (prev + delta + len) % len;
       return next;
     });
+  };
+
+  const openComment = (item: GalleryItem) => {
+    setCommentTarget(item);
+    setCommentDraft("");
+    setCommentOpen(true);
+  };
+
+  const saveComment = () => {
+    if (!commentTarget) return;
+    const clean = String(commentDraft || "").trim();
+    if (!clean) {
+      showToast("Comment cannot be empty");
+      return;
+    }
+
+    setGalleryComments((prev) => {
+      const existing = Array.isArray(prev[commentTarget.url]) ? prev[commentTarget.url] : [];
+      const next = [clean, ...existing].slice(0, 20);
+      return { ...prev, [commentTarget.url]: next };
+    });
+
+    setCommentDraft("");
+    showToast("Saved");
+  };
+
+  const shareImage = async (item: GalleryItem) => {
+    const text = item.url;
+    try {
+      if ((navigator as any).share) {
+        await (navigator as any).share({ title: item.label, text, url: item.url });
+        showToast("Shared");
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      showToast("Copied");
+    } catch {
+      showToast("Share failed");
+    }
+  };
+
+  const highlightText = (text: string, q: string) => {
+    const query = String(q || "").trim();
+    if (!query) return text;
+
+    const lower = text.toLowerCase();
+    const needle = query.toLowerCase();
+    const idx = lower.indexOf(needle);
+    if (idx === -1) return text;
+
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + query.length);
+    const after = text.slice(idx + query.length);
+
+    const bg = isLightMode ? "rgba(198,161,87,0.35)" : "rgba(198,161,87,0.22)";
+    const fg = isLightMode ? "rgba(0,0,0,0.90)" : "rgba(255,255,255,0.92)";
+
+    return (
+      <>
+        {before}
+        <span style={{ background: bg, color: fg, padding: "0 6px", borderRadius: 8 }}>{match}</span>
+        {after}
+      </>
+    );
   };
 
   // Hook stable mount and resize
@@ -781,11 +868,19 @@ export default function VisionWorkspace() {
       if (Number.isFinite(y)) setDockYSaved(y);
     } catch {}
 
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    try {
+      const raw = localStorage.getItem(GALLERY_COMMENTS_KEY);
+      const parsed = raw ? (JSON.parse(raw) as GalleryCommentMap) : {};
+      if (parsed && typeof parsed === "object") setGalleryComments(parsed);
+    } catch {
+      setGalleryComments({});
+    }
 
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
+    if (typeof window !== "undefined") {
+      const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+      if (SpeechRecognitionCtor) {
+        const recognition = new SpeechRecognitionCtor();
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = "en-GB";
@@ -803,7 +898,9 @@ export default function VisionWorkspace() {
           setIsListening(false);
           const err = String(event?.error || "");
           if (err.includes("not-allowed") || err.includes("service-not-allowed")) {
-            setVoiceError("Microphone permission is blocked. Please allow microphone access in your browser settings, then try again.");
+            setVoiceError(
+              "Microphone permission is blocked. Please allow microphone access in your browser settings, then try again."
+            );
             return;
           }
           setVoiceError("Voice is unavailable on this device or browser.");
@@ -825,6 +922,14 @@ export default function VisionWorkspace() {
       window.removeEventListener("resize", onResize);
     };
   }, [searchParams]);
+
+  // Persist gallery comments
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      localStorage.setItem(GALLERY_COMMENTS_KEY, JSON.stringify(galleryComments));
+    } catch {}
+  }, [mounted, galleryComments]);
 
   // Persist prefs
   useEffect(() => {
@@ -1007,7 +1112,7 @@ export default function VisionWorkspace() {
   useEffect(() => {
     const next = clamp(dockYSaved, dockConstraintTop, dockConstraintBottom);
     if (next !== dockYSaved) setDockYSaved(next);
-  }, [dockConstraintTop, dockConstraintBottom]); // stable hook
+  }, [dockConstraintTop, dockConstraintBottom, dockYSaved]);
 
   const showDock =
     (followUpsDockEnabled && followUps.length > 0 && !loading && !editingId && !showAuthGate && !showVoiceOverlay) ||
@@ -1103,7 +1208,7 @@ export default function VisionWorkspace() {
       setIsSidebarOpen(false);
     }
 
-    scheduleCloudSync(t.id);
+    scheduleCloudSync(t.id, t);
   };
 
   const startVoiceVision = () => {
@@ -1259,7 +1364,7 @@ export default function VisionWorkspace() {
     }
 
     showToast("Branch created");
-    scheduleCloudSync(t.id);
+    scheduleCloudSync(t.id, t);
   };
 
   const regenerateFrom = async (assistantMessageId: string) => {
@@ -1469,7 +1574,10 @@ export default function VisionWorkspace() {
                       >
                         {dockTitle}
                       </div>
-                      <div className="text-[11px] truncate" style={{ fontFamily: "var(--font-nunito)", color: dockSubtle }}>
+                      <div
+                        className="text-[11px] truncate"
+                        style={{ fontFamily: "var(--font-nunito)", color: dockSubtle }}
+                      >
                         {followUpsDockEnabled ? (followUps.length ? `${followUps.length} suggestions` : "Ready") : "Off"}
                       </div>
                     </div>
@@ -1617,7 +1725,10 @@ export default function VisionWorkspace() {
                 borderColor: isLightMode ? "rgba(0,0,0,0.15)" : `${BRAND_GOLD}33`,
               }}
             >
-              <button onClick={() => setShowVoiceOverlay(false)} className="absolute top-6 right-6 opacity-50 hover:opacity-100">
+              <button
+                onClick={() => setShowVoiceOverlay(false)}
+                className="absolute top-6 right-6 opacity-50 hover:opacity-100"
+              >
                 <X size={18} style={{ color: iconColor }} />
               </button>
 
@@ -1628,11 +1739,23 @@ export default function VisionWorkspace() {
                 <Mic size={22} style={{ color: isLightMode ? "#3f3f3f" : BRAND_GOLD }} />
               </div>
 
-              <h3 className="text-[22px] uppercase tracking-[0.22em] mb-3" style={{ fontFamily: "var(--font-gilda)", color: isLightMode ? "#111111" : "white" }}>
+              <h3
+                className="text-[22px] uppercase tracking-[0.22em] mb-2"
+                style={{ fontFamily: "var(--font-gilda)", color: isLightMode ? "#111111" : "white" }}
+              >
                 Voice
               </h3>
 
-              <p className={`text-[12px] leading-relaxed mb-8 ${theme.subtle}`}>Speak naturally, your final phrases will appear in the main input.</p>
+              <div
+                className="text-[10px] uppercase tracking-[0.45em] mb-4"
+                style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)" }}
+              >
+                {chatType === "business" ? "Atlas listening" : "Aura listening"}
+              </div>
+
+              <p className={`text-[12px] leading-relaxed mb-8 ${theme.subtle}`}>
+                Speak naturally, your final phrases will appear in the main input.
+              </p>
 
               {voiceError && (
                 <p className="text-[12px] mb-6" style={{ color: isLightMode ? "#8a2a2a" : "#ffb3b3" }}>
@@ -1738,7 +1861,11 @@ export default function VisionWorkspace() {
                   Log in
                 </a>
 
-                <a href="/forgot-password" className="text-[12px] underline underline-offset-4" style={{ color: isLightMode ? "#111111" : "white" }}>
+                <a
+                  href="/forgot-password"
+                  className="text-[12px] underline underline-offset-4"
+                  style={{ color: isLightMode ? "#111111" : "white" }}
+                >
                   Forgot password
                 </a>
               </div>
@@ -1751,7 +1878,7 @@ export default function VisionWorkspace() {
         )}
       </AnimatePresence>
 
-      {/* REGISTER CHOOSER (Header button) */}
+      {/* REGISTER CHOOSER */}
       <AnimatePresence>
         {showRegisterChooser && (
           <motion.div
@@ -1799,10 +1926,18 @@ export default function VisionWorkspace() {
               </div>
 
               <div className="mt-6 flex items-center justify-between">
-                <a href="/login" className="text-[12px] underline underline-offset-4" style={{ color: isLightMode ? "#111111" : "white" }}>
+                <a
+                  href="/login"
+                  className="text-[12px] underline underline-offset-4"
+                  style={{ color: isLightMode ? "#111111" : "white" }}
+                >
                   Log in
                 </a>
-                <a href="/forgot-password" className="text-[12px] underline underline-offset-4" style={{ color: isLightMode ? "#111111" : "white" }}>
+                <a
+                  href="/forgot-password"
+                  className="text-[12px] underline underline-offset-4"
+                  style={{ color: isLightMode ? "#111111" : "white" }}
+                >
                   Forgot password
                 </a>
               </div>
@@ -1884,15 +2019,48 @@ export default function VisionWorkspace() {
                 }}
               >
                 <div className="min-w-0">
-                  <div className="text-[12px] font-semibold truncate" style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#111111" : "white" }}>
+                  <div
+                    className="text-[12px] font-semibold truncate"
+                    style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#111111" : "white" }}
+                  >
                     {lightboxItems[lightboxIndex]?.label || "Image"}
                   </div>
-                  <div className="text-[11px]" style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)" }}>
+                  <div
+                    className="text-[11px]"
+                    style={{
+                      fontFamily: "var(--font-nunito)",
+                      color: isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
+                    }}
+                  >
                     {lightboxIndex + 1} of {lightboxItems.length}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const item = lightboxItems[lightboxIndex];
+                      if (item) shareImage(item);
+                    }}
+                    className="px-4 h-9 rounded-full border text-[10px] font-semibold uppercase tracking-[0.22em] opacity-90 hover:opacity-100"
+                    style={{ fontFamily: "var(--font-nunito)", borderColor: arrowBorder, background: arrowBg, color: arrowColor }}
+                  >
+                    Share
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const item = lightboxItems[lightboxIndex];
+                      if (item) openComment(item);
+                    }}
+                    className="px-4 h-9 rounded-full border text-[10px] font-semibold uppercase tracking-[0.22em] opacity-90 hover:opacity-100"
+                    style={{ fontFamily: "var(--font-nunito)", borderColor: arrowBorder, background: arrowBg, color: arrowColor }}
+                  >
+                    Comment
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => stepLightbox("prev")}
@@ -1916,6 +2084,129 @@ export default function VisionWorkspace() {
         )}
       </AnimatePresence>
 
+      {/* COMMENT MODAL */}
+      <AnimatePresence>
+        {commentOpen && commentTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[270] flex items-center justify-center bg-black/70 backdrop-blur-md p-6"
+            onClick={() => setCommentOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 26 }}
+              className="w-full max-w-xl rounded-[28px] overflow-hidden border shadow-2xl"
+              style={{
+                borderColor: isLightMode ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.14)",
+                background: isLightMode ? "rgba(255,255,255,0.98)" : "rgba(10,10,10,0.96)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="p-6 flex items-start justify-between gap-4 border-b"
+                style={{ borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)" }}
+              >
+                <div className="min-w-0">
+                  <div className="text-[12px] font-semibold truncate" style={{ fontFamily: "var(--font-nunito)" }}>
+                    Comment
+                  </div>
+                  <div className="text-[11px] opacity-60 truncate" style={{ fontFamily: "var(--font-nunito)" }}>
+                    {commentTarget.label}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCommentOpen(false)}
+                  className="w-10 h-10 rounded-full border flex items-center justify-center opacity-80 hover:opacity-100"
+                  style={{
+                    borderColor: isLightMode ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.14)",
+                    background: isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.06)",
+                  }}
+                  aria-label="Close"
+                >
+                  <X size={18} style={{ color: iconColor }} />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <div
+                  className="rounded-[22px] overflow-hidden border mb-5"
+                  style={{ borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)" }}
+                >
+                  <img
+                    src={commentTarget.url}
+                    alt={commentTarget.label}
+                    className="w-full"
+                    style={{ height: 240, objectFit: "cover" }}
+                  />
+                </div>
+
+                <textarea
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  placeholder="Add a note, styling, mood, lighting, composition, anything you want to remember."
+                  className="w-full rounded-[22px] border px-5 py-4 bg-transparent outline-none resize-none"
+                  style={{
+                    fontFamily: "var(--font-nunito)",
+                    borderColor: isLightMode ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.14)",
+                    color: isLightMode ? "#111111" : "white",
+                    minHeight: 120,
+                  }}
+                />
+
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <div className="text-[11px] opacity-60" style={{ fontFamily: "var(--font-nunito)" }}>
+                    Saved locally
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={saveComment}
+                    className="px-6 h-10 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em]"
+                    style={{ fontFamily: "var(--font-nunito)", background: BRAND_GOLD, color: "#111111" }}
+                  >
+                    Save
+                  </button>
+                </div>
+
+                {Array.isArray(galleryComments[commentTarget.url]) && galleryComments[commentTarget.url].length > 0 && (
+                  <div className="mt-6">
+                    <div
+                      className="text-[10px] uppercase tracking-[0.28em] opacity-60 mb-3"
+                      style={{ fontFamily: "var(--font-nunito)" }}
+                    >
+                      Notes
+                    </div>
+                    <div className="space-y-2">
+                      {galleryComments[commentTarget.url].slice(0, 5).map((c, i) => (
+                        <div
+                          key={`${commentTarget.url}_${i}`}
+                          className="rounded-[18px] border px-4 py-3 text-[12px]"
+                          style={{
+                            fontFamily: "var(--font-nunito)",
+                            borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)",
+                            background: isLightMode ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.03)",
+                            color: isLightMode ? "rgba(0,0,0,0.82)" : "rgba(255,255,255,0.88)",
+                            whiteSpace: "pre-wrap",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {c}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* SIDEBAR */}
       <motion.aside
         animate={{ width: isSidebarOpen ? 300 : 0, x: mobileSidebar && !isSidebarOpen ? -40 : 0 }}
@@ -1926,7 +2217,10 @@ export default function VisionWorkspace() {
         <div className="p-8 flex flex-col h-full w-[300px]">
           <div className="flex items-center justify-between mb-10">
             <div className="flex items-center gap-4">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center border" style={{ borderColor: isLightMode ? "rgba(0,0,0,0.18)" : `${BRAND_GOLD}33` }}>
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center border"
+                style={{ borderColor: isLightMode ? "rgba(0,0,0,0.18)" : `${BRAND_GOLD}33` }}
+              >
                 <Sparkles size={14} style={{ color: iconColor }} />
               </div>
               <span className="text-[10px] uppercase tracking-[0.45em]" style={{ opacity: 0.7, fontFamily: "var(--font-nunito)" }}>
@@ -2034,7 +2328,7 @@ export default function VisionWorkspace() {
                             />
                           ) : (
                             <div className="text-[12px] font-semibold truncate" style={{ fontFamily: "var(--font-nunito)" }}>
-                              {t.title || (t.chatType === "business" ? "For Vendors" : "For Couples")}
+                              {highlightText(t.title || (t.chatType === "business" ? "For Vendors" : "For Couples"), sidebarQuery)}
                             </div>
                           )}
 
@@ -2215,10 +2509,16 @@ export default function VisionWorkspace() {
 
           <div className="w-full px-6 md:px-12 pt-7 pb-7">
             <div className="text-center">
-              <h1 className="text-[22px] md:text-[34px] uppercase leading-none tracking-tight" style={{ fontFamily: "var(--font-gilda)", color: isLightMode ? "#111111" : "white" }}>
+              <h1
+                className="text-[22px] md:text-[34px] uppercase leading-none tracking-tight"
+                style={{ fontFamily: "var(--font-gilda)", color: isLightMode ? "#111111" : "white" }}
+              >
                 5 STAR WEDDINGS
               </h1>
-              <h2 className="text-[9px] md:text-[11px] uppercase tracking-[0.55em] mt-1" style={{ fontFamily: "var(--font-gilda)", color: BRAND_GOLD }}>
+              <h2
+                className="text-[9px] md:text-[11px] uppercase tracking-[0.55em] mt-1"
+                style={{ fontFamily: "var(--font-gilda)", color: BRAND_GOLD }}
+              >
                 THE CONCIERGE
               </h2>
             </div>
@@ -2227,7 +2527,7 @@ export default function VisionWorkspace() {
 
         {/* BODY */}
         <div className="flex-1 flex overflow-hidden">
-          {/* CHAT COLUMN, footer is inside this column only */}
+          {/* CHAT COLUMN */}
           <div className="flex-1 flex flex-col overflow-hidden min-w-0 border-r border-white/0">
             <main ref={scrollRef} className="flex-1 overflow-y-auto px-6 md:px-12 py-4">
               <div className="max-w-3xl mx-auto space-y-8 pb-10 pt-6">
@@ -2247,7 +2547,12 @@ export default function VisionWorkspace() {
                         fontFamily: "var(--font-nunito)",
                         letterSpacing: "0.18em",
                         background: chatType === "business" ? BRAND_GOLD : "transparent",
-                        color: chatType === "business" ? "#111111" : isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
+                        color:
+                          chatType === "business"
+                            ? "#111111"
+                            : isLightMode
+                            ? "rgba(0,0,0,0.55)"
+                            : "rgba(255,255,255,0.55)",
                       }}
                     >
                       For Vendors
@@ -2259,7 +2564,12 @@ export default function VisionWorkspace() {
                         fontFamily: "var(--font-nunito)",
                         letterSpacing: "0.18em",
                         background: chatType === "couple" ? "rgba(24,63,52,0.95)" : "transparent",
-                        color: chatType === "couple" ? "white" : isLightMode ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)",
+                        color:
+                          chatType === "couple"
+                            ? "white"
+                            : isLightMode
+                            ? "rgba(0,0,0,0.55)"
+                            : "rgba(255,255,255,0.55)",
                       }}
                     >
                       For Couples
@@ -2272,7 +2582,11 @@ export default function VisionWorkspace() {
                     const isUser = m.role === "user";
                     const isEditingThis = isUser && editingId === m.id;
 
-                    const bubbleBg = isUser ? "rgba(24,63,52,0.95)" : isLightMode ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)";
+                    const bubbleBg = isUser
+                      ? "rgba(24,63,52,0.95)"
+                      : isLightMode
+                      ? "rgba(0,0,0,0.03)"
+                      : "rgba(255,255,255,0.04)";
                     const bubbleBorder = isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)";
 
                     return (
@@ -2283,8 +2597,17 @@ export default function VisionWorkspace() {
                         className={`flex gap-5 ${isUser ? "flex-row-reverse" : ""}`}
                         style={{ willChange: "transform, opacity" }}
                       >
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 mt-1" style={{ borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)" }}>
-                          {isUser ? <User size={16} style={{ color: iconColor }} /> : <Sparkles size={16} style={{ color: iconColor }} />}
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 mt-1"
+                          style={{
+                            borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)",
+                          }}
+                        >
+                          {isUser ? (
+                            <User size={16} style={{ color: iconColor }} />
+                          ) : (
+                            <Sparkles size={16} style={{ color: iconColor }} />
+                          )}
                         </div>
 
                         <div className="max-w-[76%]">
@@ -2305,7 +2628,13 @@ export default function VisionWorkspace() {
                                 value={editDraft}
                                 onChange={(e) => setEditDraft(e.target.value)}
                                 className="w-full bg-transparent outline-none resize-none"
-                                style={{ fontFamily: "var(--font-nunito)", fontSize: 16, lineHeight: "1.55", color: "inherit", minHeight: 80 }}
+                                style={{
+                                  fontFamily: "var(--font-nunito)",
+                                  fontSize: 16,
+                                  lineHeight: "1.55",
+                                  color: "inherit",
+                                  minHeight: 80,
+                                }}
                               />
                             ) : (
                               m.content
@@ -2318,21 +2647,41 @@ export default function VisionWorkspace() {
                               <>
                                 {isEditingThis ? (
                                   <>
-                                    <button onClick={() => saveEdit(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Save" title="Save">
+                                    <button
+                                      onClick={() => saveEdit(m.id)}
+                                      className="opacity-80 hover:opacity-100 transition-opacity"
+                                      aria-label="Save"
+                                      title="Save"
+                                    >
                                       <Check size={16} style={{ color: actionIconColor }} />
                                     </button>
 
-                                    <button onClick={cancelEdit} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Cancel" title="Cancel">
+                                    <button
+                                      onClick={cancelEdit}
+                                      className="opacity-80 hover:opacity-100 transition-opacity"
+                                      aria-label="Cancel"
+                                      title="Cancel"
+                                    >
                                       <X size={16} style={{ color: actionIconColor }} />
                                     </button>
                                   </>
                                 ) : (
                                   <>
-                                    <button onClick={() => startEdit(m.id, m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Edit" title="Edit">
+                                    <button
+                                      onClick={() => startEdit(m.id, m.content)}
+                                      className="opacity-80 hover:opacity-100 transition-opacity"
+                                      aria-label="Edit"
+                                      title="Edit"
+                                    >
                                       <Pencil size={16} style={{ color: actionIconColor }} />
                                     </button>
 
-                                    <button onClick={() => branchFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Branch" title="Branch">
+                                    <button
+                                      onClick={() => branchFrom(m.id)}
+                                      className="opacity-80 hover:opacity-100 transition-opacity"
+                                      aria-label="Branch"
+                                      title="Branch"
+                                    >
                                       <GitBranch size={16} style={{ color: actionIconColor }} />
                                     </button>
                                   </>
@@ -2340,15 +2689,30 @@ export default function VisionWorkspace() {
                               </>
                             ) : (
                               <>
-                                <button onClick={() => onCopy(m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Copy" title="Copy">
+                                <button
+                                  onClick={() => onCopy(m.content)}
+                                  className="opacity-80 hover:opacity-100 transition-opacity"
+                                  aria-label="Copy"
+                                  title="Copy"
+                                >
                                   <Copy size={16} style={{ color: actionIconColor }} />
                                 </button>
 
-                                <button onClick={() => onShare(m.content)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Share" title="Share">
+                                <button
+                                  onClick={() => onShare(m.content)}
+                                  className="opacity-80 hover:opacity-100 transition-opacity"
+                                  aria-label="Share"
+                                  title="Share"
+                                >
                                   <Share2 size={16} style={{ color: actionIconColor }} />
                                 </button>
 
-                                <button onClick={() => setFeedback(m.id, "up")} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Like" title="Like">
+                                <button
+                                  onClick={() => setFeedback(m.id, "up")}
+                                  className="opacity-80 hover:opacity-100 transition-opacity"
+                                  aria-label="Like"
+                                  title="Like"
+                                >
                                   <ThumbsUp
                                     size={16}
                                     style={{
@@ -2357,7 +2721,12 @@ export default function VisionWorkspace() {
                                   />
                                 </button>
 
-                                <button onClick={() => setFeedback(m.id, "down")} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Dislike" title="Dislike">
+                                <button
+                                  onClick={() => setFeedback(m.id, "down")}
+                                  className="opacity-80 hover:opacity-100 transition-opacity"
+                                  aria-label="Dislike"
+                                  title="Dislike"
+                                >
                                   <ThumbsDown
                                     size={16}
                                     style={{
@@ -2366,11 +2735,22 @@ export default function VisionWorkspace() {
                                   />
                                 </button>
 
-                                <button onClick={() => branchFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Branch" title="Branch">
+                                <button
+                                  onClick={() => branchFrom(m.id)}
+                                  className="opacity-80 hover:opacity-100 transition-opacity"
+                                  aria-label="Branch"
+                                  title="Branch"
+                                >
                                   <GitBranch size={16} style={{ color: actionIconColor }} />
                                 </button>
 
-                                <button onClick={() => regenerateFrom(m.id)} className="opacity-80 hover:opacity-100 transition-opacity" aria-label="Regenerate" title="Regenerate" disabled={loading}>
+                                <button
+                                  onClick={() => regenerateFrom(m.id)}
+                                  className="opacity-80 hover:opacity-100 transition-opacity"
+                                  aria-label="Regenerate"
+                                  title="Regenerate"
+                                  disabled={loading}
+                                >
                                   <RefreshCcw size={16} style={{ color: actionIconColor }} />
                                 </button>
                               </>
@@ -2384,8 +2764,18 @@ export default function VisionWorkspace() {
 
                 <AnimatePresence>
                   {loading && !hasStreamedAny && (
-                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="flex gap-5">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 mt-1" style={{ borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)" }}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 12 }}
+                      className="flex gap-5"
+                    >
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 mt-1"
+                        style={{
+                          borderColor: isLightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)",
+                        }}
+                      >
                         <Sparkles size={16} style={{ color: iconColor }} />
                       </div>
 
@@ -2412,7 +2802,7 @@ export default function VisionWorkspace() {
               </div>
             </main>
 
-            {/* INPUT + FOOTER, inside chat column only */}
+            {/* INPUT + FOOTER */}
             <footer className="shrink-0 pb-10 pt-6">
               <div className="max-w-3xl mx-auto px-6 md:px-12">
                 {showRegisterNudge && !showAuthGate && (
@@ -2426,7 +2816,11 @@ export default function VisionWorkspace() {
                     }}
                   >
                     <span>Register to save your conversation and continue.</span>
-                    <button onClick={() => setShowRegisterChooser(true)} className="underline underline-offset-4" style={{ color: isLightMode ? "#111111" : "white" }}>
+                    <button
+                      onClick={() => setShowRegisterChooser(true)}
+                      className="underline underline-offset-4"
+                      style={{ color: isLightMode ? "#111111" : "white" }}
+                    >
                       Register
                     </button>
                   </div>
@@ -2439,7 +2833,11 @@ export default function VisionWorkspace() {
                     borderColor: isLightMode ? "rgba(0,0,0,0.35)" : `${BRAND_GOLD}66`,
                   }}
                 >
-                  <button onClick={() => setShowVoiceOverlay(true)} className="opacity-90 hover:opacity-100 transition-opacity" aria-label="Voice">
+                  <button
+                    onClick={() => setShowVoiceOverlay(true)}
+                    className="opacity-90 hover:opacity-100 transition-opacity"
+                    aria-label="Voice"
+                  >
                     <Mic size={18} style={{ color: isLightMode ? "#3f3f3f" : BRAND_GOLD }} />
                   </button>
 
@@ -2458,7 +2856,12 @@ export default function VisionWorkspace() {
                     }}
                     placeholder={chatType === "business" ? "Tell Atlas what you want to achieve." : "Tell Aura what you are creating."}
                     className="flex-1 bg-transparent outline-none resize-none leading-[1.4] pt-[2px]"
-                    style={{ height: 44, fontFamily: "var(--font-nunito)", fontSize: 16, color: isLightMode ? "#111111" : "white" }}
+                    style={{
+                      height: 44,
+                      fontFamily: "var(--font-nunito)",
+                      fontSize: 16,
+                      color: isLightMode ? "#111111" : "white",
+                    }}
                   />
 
                   <button
@@ -2487,7 +2890,7 @@ export default function VisionWorkspace() {
             </footer>
           </div>
 
-          {/* PROJECTION CANVAS, sticky header, scroll under */}
+          {/* PROJECTION CANVAS */}
           <AnimatePresence>
             {isProjectionOpen && (
               <motion.aside
@@ -2508,6 +2911,11 @@ export default function VisionWorkspace() {
                     background: isLightMode ? "rgba(255,255,255,0.92)" : "rgba(7,7,7,0.88)",
                     backdropFilter: "blur(10px)",
                     borderBottom: `1px solid ${isLightMode ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)"}`,
+                    boxShadow: projectionScrolled
+                      ? isLightMode
+                        ? "0 8px 22px rgba(0,0,0,0.10)"
+                        : "0 10px 26px rgba(0,0,0,0.45)"
+                      : "none",
                   }}
                 >
                   <div className="flex items-center justify-between px-2 relative">
@@ -2571,7 +2979,6 @@ export default function VisionWorkspace() {
                     </div>
                   </div>
 
-                  {/* subtle fade */}
                   <div
                     className="absolute left-0 right-0 bottom-0 h-6 pointer-events-none"
                     style={{
@@ -2584,7 +2991,14 @@ export default function VisionWorkspace() {
                 </div>
 
                 {/* Scrollable content */}
-                <div className="flex-1 overflow-y-auto px-10 pb-10 pt-7">
+                <div
+                  ref={projectionScrollRef}
+                  className="flex-1 overflow-y-auto px-10 pb-10 pt-7"
+                  onScroll={(e) => {
+                    const top = (e.currentTarget as HTMLDivElement).scrollTop || 0;
+                    setProjectionScrolled(top > 6);
+                  }}
+                >
                   <div className="px-2">
                     <div className="grid grid-cols-2 gap-4">
                       {projection.cards.map((c) => (
@@ -2599,7 +3013,10 @@ export default function VisionWorkspace() {
                           <div className="text-[10px] uppercase tracking-[0.28em] opacity-70" style={{ fontFamily: "var(--font-nunito)" }}>
                             {c.k}
                           </div>
-                          <div className="mt-2 text-[14px]" style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#111111" : "white", lineHeight: 1.35 }}>
+                          <div
+                            className="mt-2 text-[14px]"
+                            style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "#111111" : "white", lineHeight: 1.35 }}
+                          >
                             {c.v}
                           </div>
                         </div>
@@ -2641,7 +3058,10 @@ export default function VisionWorkspace() {
                             <div
                               key={n}
                               className="text-[12px] leading-relaxed"
-                              style={{ fontFamily: "var(--font-nunito)", color: isLightMode ? "rgba(0,0,0,0.80)" : "rgba(255,255,255,0.88)" }}
+                              style={{
+                                fontFamily: "var(--font-nunito)",
+                                color: isLightMode ? "rgba(0,0,0,0.80)" : "rgba(255,255,255,0.88)",
+                              }}
                             >
                               {n}
                             </div>
@@ -2653,46 +3073,107 @@ export default function VisionWorkspace() {
 
                   {/* 2 up carousel, click opens slider */}
                   {showGallery && (
-                    <div ref={carouselRef} className="flex gap-6 overflow-x-auto px-2 pb-2 mt-8" style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
-                      {(chatType === "couple" ? auraGallery : atlasGallery).map((item, idx) => (
-                        <button
-                          key={item.url}
-                          type="button"
-                          onClick={() => openLightbox(chatType === "couple" ? auraGallery : atlasGallery, idx)}
-                          className="shrink-0 text-left"
-                          style={{ width: "calc((100% - 24px) / 2)", scrollSnapAlign: "start" }}
-                          aria-label="Open image"
-                        >
-                          <motion.div
-                            whileHover={{ scale: 1.01 }}
-                            className="aspect-[4/5] rounded-[26px] overflow-hidden relative border shadow-sm"
-                            style={{ borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)" }}
+                    <div
+                      ref={carouselRef}
+                      className="flex gap-6 overflow-x-auto px-2 pb-2 mt-8"
+                      style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}
+                    >
+                      {(chatType === "couple" ? auraGallery : atlasGallery).map((item, idx) => {
+                        const count = Array.isArray(galleryComments[item.url]) ? galleryComments[item.url].length : 0;
+
+                        return (
+                          <button
+                            key={item.url}
+                            type="button"
+                            onClick={() => openLightbox(chatType === "couple" ? auraGallery : atlasGallery, idx)}
+                            className="shrink-0 text-left"
+                            style={{ width: "calc((100% - 24px) / 2)", scrollSnapAlign: "start" }}
+                            aria-label="Open image"
                           >
-                            <img
-                              src={item.url}
-                              alt={item.label}
-                              className="object-cover w-full h-full"
-                              loading="lazy"
-                              onError={(e) => {
-                                const el = e.currentTarget;
-                                el.style.display = "none";
-                                const parent = el.parentElement;
-                                if (parent) {
-                                  parent.style.background = isLightMode ? "linear-gradient(180deg,#f2f2f2,#e6e6e6)" : "linear-gradient(180deg,#111,#0b0b0b)";
-                                }
-                              }}
-                            />
-                            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)" }} />
-                            <div
-                              className="absolute left-4 right-4 bottom-4 text-[11px] truncate"
-                              style={{ fontFamily: "var(--font-nunito)", color: "rgba(255,255,255,0.90)" }}
-                              title={item.label}
+                            <motion.div
+                              whileHover={{ scale: 1.01 }}
+                              className="aspect-[4/5] rounded-[26px] overflow-hidden relative border shadow-sm"
+                              style={{ borderColor: isLightMode ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)" }}
                             >
-                              {item.label}
-                            </div>
-                          </motion.div>
-                        </button>
-                      ))}
+                              <img
+                                src={item.url}
+                                alt={item.label}
+                                className="object-cover w-full h-full"
+                                loading="lazy"
+                                onError={(e) => {
+                                  const el = e.currentTarget;
+                                  el.style.display = "none";
+                                  const parent = el.parentElement;
+                                  if (parent) {
+                                    parent.style.background = isLightMode
+                                      ? "linear-gradient(180deg,#f2f2f2,#e6e6e6)"
+                                      : "linear-gradient(180deg,#111,#0b0b0b)";
+                                  }
+                                }}
+                              />
+                              <div
+                                className="absolute inset-0 pointer-events-none"
+                                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.45), transparent)" }}
+                              />
+
+                              <div className="absolute left-4 right-4 bottom-4 flex items-center justify-between gap-3">
+                                <div
+                                  className="text-[11px] truncate"
+                                  style={{ fontFamily: "var(--font-nunito)", color: "rgba(255,255,255,0.90)" }}
+                                  title={item.label}
+                                >
+                                  {item.label}
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      shareImage(item);
+                                    }}
+                                    className="w-9 h-9 rounded-full border flex items-center justify-center opacity-90 hover:opacity-100"
+                                    aria-label="Share image"
+                                    title="Share"
+                                    style={{ borderColor: "rgba(255,255,255,0.20)", background: "rgba(0,0,0,0.25)" }}
+                                  >
+                                    <Share2 size={16} style={{ color: "rgba(255,255,255,0.92)" }} />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openComment(item);
+                                    }}
+                                    className="w-9 h-9 rounded-full border flex items-center justify-center opacity-90 hover:opacity-100 relative"
+                                    aria-label="Comment on image"
+                                    title="Comment"
+                                    style={{ borderColor: "rgba(255,255,255,0.20)", background: "rgba(0,0,0,0.25)" }}
+                                  >
+                                    <MessageSquare size={16} style={{ color: "rgba(255,255,255,0.92)" }} />
+                                    {count > 0 && (
+                                      <span
+                                        className="absolute -top-1 -right-1 text-[10px] font-semibold rounded-full px-[6px] py-[1px] border"
+                                        style={{
+                                          fontFamily: "var(--font-nunito)",
+                                          background: "rgba(198,161,87,0.95)",
+                                          color: "#111111",
+                                          borderColor: "rgba(0,0,0,0.20)",
+                                        }}
+                                      >
+                                        {count > 9 ? "9+" : count}
+                                      </span>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

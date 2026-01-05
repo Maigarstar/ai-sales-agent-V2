@@ -1,7 +1,5 @@
-
 // src/app/vision/VisionWorkspace.tsx
 "use client";
-import { createBrowserClient } from "@supabase/ssr";
 
 /* VISION_PILLS_BEGIN */
 function buildVisionPills(reply: string): string[] {
@@ -84,7 +82,6 @@ type Thread = {
   id: string;
   title: string;
   chatType: ChatType;
-  organisation_id?: string | null;
   messages: Message[];
   updatedAt: number;
 };
@@ -423,22 +420,6 @@ function shortLabel(s: string, max = 34) {
 
 export default function VisionWorkspace() {
   const searchParams = useSearchParams();
-
-  const organisationIdFromQuery = useMemo(() => {
-    const v =
-      searchParams?.get("organisation_id") ||
-      searchParams?.get("organisationId") ||
-      searchParams?.get("org") ||
-      null;
-
-    const clean = typeof v === "string" ? v.trim() : "";
-    return clean ? clean : null;
-  }, [searchParams]);
-
-  const resolveOrganisationId = (thread?: Thread | null) => {
-    return thread?.organisation_id ?? organisationIdFromQuery ?? null;
-  };
-
 
   const [mounted, setMounted] = useState(false);
 
@@ -1498,38 +1479,6 @@ const [activeThreadId, setActiveThreadId] = useState<string>("");
   };
 
   const handleSend = async () => {
-
-      
-      // Initialize Sovereign Browser Client
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-
-      
-      // Sovereign Guard: Ensure a thread is active
-      if (!currentThread) {
-        console.error("Sovereign Error: No active thread selected.");
-        return;
-      }
-
-      // Sovereign Lock: Check if a human operator has taken over control
-      const thread = currentThread;
-      if (!thread) return;
-
-      const { data: convData  } = await supabase
-        .from("conversations")
-        .select("takeover_status")
-        .eq("id", thread.id)
-        .single();
-
-
-      if (convData?.takeover_status === 'human') {
-        console.log("Sovereign Lock Active: AI muted for human takeover.");
-        setLoading(false);
-        return;
-      }
-
     if (!input.trim() || loading) return;
     if (!currentThread) return;
 
@@ -1582,19 +1531,6 @@ const [activeThreadId, setActiveThreadId] = useState<string>("");
 
       const finalText = String(result.text || currentText || "Connection interrupted.").trim();
       updateAssistantContent(currentThread.id, assistantId, finalText);
-      // Lead Enrichment: Automatically extract names/details if this is the first turn
-      if (userTurns === 0 && finalText.length > 5) {
-        fetch("/api/leads/enrich", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            threadId: currentThread.id, 
-            content: finalText,
-            organisation_id: resolveOrganisationId(currentThread) 
-          }),
-        }).catch(() => null);
-      }
-
 
       const finalAssistant: Message = { id: assistantId, role: "assistant", content: finalText };
       const finalMsgs: Message[] = [...base, finalAssistant];
@@ -3549,4 +3485,4 @@ const [activeThreadId, setActiveThreadId] = useState<string>("");
       </div>
     </div>
   );
-} 
+}

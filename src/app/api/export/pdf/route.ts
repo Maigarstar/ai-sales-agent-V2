@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Buffer } from "buffer";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export const runtime = "nodejs";
@@ -59,12 +60,9 @@ function wrapText(text: string, font: any, size: number, maxWidth: number) {
 }
 
 export async function GET() {
-  return new Response(JSON.stringify({ ok: true, version: "pdf-live-v1" }), {
+  return new Response(JSON.stringify({ ok: true, version: "pdf-live-v2" }), {
     status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store",
-    },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }
 
@@ -100,6 +98,7 @@ export async function POST(req: NextRequest) {
     const topic = cleanTopic(firstUser);
     const stamp = formatStamp(new Date());
 
+    /* Cover */
     const cover = pdfDoc.addPage([pageWidth, pageHeight]);
 
     cover.drawText(BRAND_LINE, {
@@ -169,6 +168,7 @@ export async function POST(req: NextRequest) {
       color: MUTED,
     });
 
+    /* Transcript */
     let page = pdfDoc.addPage([pageWidth, pageHeight]);
     let y = pageHeight - headerH - 24;
 
@@ -214,11 +214,11 @@ export async function POST(req: NextRequest) {
       }
 
       y -= 12;
-
       page.drawRectangle({ x: marginX, y, width: maxWidth, height: 1, color: HAIRLINE });
       y -= 18;
     }
 
+    /* Headers and footers */
     const pages = pdfDoc.getPages();
     const total = pages.length;
 
@@ -255,9 +255,11 @@ export async function POST(req: NextRequest) {
 
     const pdfBytes = await pdfDoc.save();
 
-    const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
+    /* Critical: copy to a real ArrayBuffer so TS stops complaining about SharedArrayBuffer */
+    const pdfBodyArrayBuffer = new ArrayBuffer(pdfBytes.byteLength);
+    new Uint8Array(pdfBodyArrayBuffer).set(pdfBytes as any);
 
-    return new Response(pdfBlob, {
+    return new Response(pdfBodyArrayBuffer, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",

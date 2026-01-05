@@ -66,8 +66,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  MessageSquare,
-} from "lucide-react";
+  MessageSquare, FileDown } from "lucide-react";
 
 type ChatRole = "user" | "assistant";
 type ChatType = "business" | "couple";
@@ -479,7 +478,91 @@ const [activeThreadId, setActiveThreadId] = useState<string>("");
   const pillsBurstCountRef = useRef<number>(0);
   const pillsLastAssistantKeyRef = useRef<string>("");const [loading, setLoading] = useState(false);
 
-  // Streaming UX
+  
+  /* SHARE_LINK_BEGIN */
+  const [shareNote, setShareNote] = useState<string>("");
+  const [shareBusy, setShareBusy] = useState(false);
+
+  async function handleShareLink() {
+    if (shareBusy) return;
+
+    const threadId = String((typeof activeThreadId !== "undefined" ? activeThreadId : "") || "").trim();
+    if (!threadId) {
+      setShareNote("Send two messages first, then share.");
+      setTimeout(() => setShareNote(""), 1600);
+      return;
+    }
+
+    setShareBusy(true);
+    setShareNote("");
+
+    try {
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId }),
+      });
+
+      const data = await res.json().catch(() => ({} as any));
+      const pathPart = String(data?.path || "").trim();
+
+      if (!res.ok || !data?.ok || !pathPart) {
+        setShareNote("Share failed.");
+        setTimeout(() => setShareNote(""), 1600);
+        return;
+      }
+
+      const full = window.location.origin + pathPart;
+      await navigator.clipboard.writeText(full);
+
+      setShareNote("Link copied.");
+      setTimeout(() => setShareNote(""), 1600);
+    } catch {
+      setShareNote("Share failed.");
+      setTimeout(() => setShareNote(""), 1600);
+    } finally {
+      setShareBusy(false);
+    }
+  }
+  /* SHARE_LINK_END */
+  /* EXPORT_PDF_BEGIN */
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  async function handleExportPdf() {
+    if (pdfBusy) return;
+
+    const threadId = String((typeof activeThreadId !== "undefined" ? activeThreadId : "") || "").trim();
+    if (!threadId) return;
+
+    setPdfBusy(true);
+
+    try {
+      const res = await fetch("/api/export/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId }),
+      });
+
+      if (!res.ok) return;
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "taigenic-conversation.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      URL.revokeObjectURL(url);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+  /* EXPORT_PDF_END */
+
+// Streaming UX
   const [hasStreamedAny, setHasStreamedAny] = useState(false);
 
   // Editing (message editing)
@@ -2869,6 +2952,16 @@ const [activeThreadId, setActiveThreadId] = useState<string>("");
                                 >
                                   <Share2 size={16} style={{ color: actionIconColor }} />
                                 </button>
+
+              <button
+                onClick={handleExportPdf}
+                disabled={pdfBusy}
+                className="rounded-full p-2 transition-all text-gray-400 hover:text-[#1F4D3E] hover:bg-green-50 disabled:opacity-50"
+                title="Export PDF"
+                type="button"
+              >
+                <FileDown size={18} />
+              </button>
 
                                 <button
                                   onClick={() => setFeedback(m.id, "up")}

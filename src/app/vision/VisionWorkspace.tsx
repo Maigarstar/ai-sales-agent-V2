@@ -540,7 +540,7 @@ const [activeThreadId, setActiveThreadId] = useState<string>("");
       const res = await fetch("/api/export/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threadId }),
+        body: JSON.stringify({ threadId: activeThreadId || null, messages }),
       });
 
       if (!res.ok) return;

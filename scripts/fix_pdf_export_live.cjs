@@ -1,4 +1,16 @@
-import { NextRequest } from "next/server";
+const fs = require("fs");
+const path = require("path");
+
+const file = path.join(process.cwd(), "src/app/api/export/pdf/route.ts");
+if (!fs.existsSync(file)) {
+  console.error("Not found:", file);
+  process.exit(1);
+}
+
+const bak = file + ".bak_live_fix";
+if (!fs.existsSync(bak)) fs.copyFileSync(file, bak);
+
+const src = `import { NextRequest } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export const runtime = "nodejs";
@@ -22,17 +34,17 @@ function formatStamp(d: Date) {
 }
 
 function cleanTopic(text: string) {
-  const t = String(text || "").replace(/\s+/g, " ").trim();
+  const t = String(text || "").replace(/\\s+/g, " ").trim();
   if (!t) return "";
   return t.length > 88 ? t.slice(0, 88) + "…" : t;
 }
 
 function wrapText(text: string, font: any, size: number, maxWidth: number) {
-  const paras = String(text || "").split(/\n+/g);
+  const paras = String(text || "").split(/\\n+/g);
   const lines: string[] = [];
 
   for (const para of paras) {
-    const words = para.split(/\s+/g).filter(Boolean);
+    const words = para.split(/\\s+/g).filter(Boolean);
     if (words.length === 0) {
       lines.push("");
       continue;
@@ -255,9 +267,7 @@ export async function POST(req: NextRequest) {
 
     const pdfBytes = await pdfDoc.save();
 
-    const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
-
-    return new Response(pdfBlob, {
+    return new Response(pdfBytes, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
@@ -272,3 +282,8 @@ export async function POST(req: NextRequest) {
     });
   }
 }
+`;
+
+fs.writeFileSync(file, src, "utf8");
+console.log("Updated:", file);
+console.log("Backup:", bak);

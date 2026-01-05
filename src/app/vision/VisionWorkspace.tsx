@@ -451,9 +451,33 @@ export default function VisionWorkspace() {
   // Chat
   const [chatType, setChatType] = useState<ChatType>("couple");
   const [threads, setThreads] = useState<Thread[]>([]);
-  const [activeThreadId, setActiveThreadId] = useState<string>("");
+  
+  /* THREADS_REFRESH_HELPER_BEGIN */
+  async function refreshThreads(preferId?: string) {
+    try {
+      const tRes = await fetch("/api/threads", { method: "GET" });
+      if (!tRes.ok) return;
+
+      const tData = await tRes.json().catch(() => ({} as any));
+      const list = Array.isArray((tData as any)?.threads) ? (tData as any).threads : [];
+      setThreads(list);
+
+      
+      const nextId = String(preferId || "").trim();
+      if (nextId && !String(activeThreadId || "").trim()) {
+        setActiveThreadId(nextId);
+      }
+      
+    } catch {
+      // ignore
+    }
+  }
+  /* THREADS_REFRESH_HELPER_END */
+const [activeThreadId, setActiveThreadId] = useState<string>("");
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  
+  const pillsBurstCountRef = useRef<number>(0);
+  const pillsLastAssistantKeyRef = useRef<string>("");const [loading, setLoading] = useState(false);
 
   // Streaming UX
   const [hasStreamedAny, setHasStreamedAny] = useState(false);
@@ -2982,6 +3006,32 @@ export default function VisionWorkspace() {
 
                                     {/* VISION_PILLS_RENDER */}
                   {(() => {
+/* PILLS_GATE_MAX_BEGIN */
+                const userCount = (messages as any[]).filter((m: any) => m?.role === "user").length;
+                const lastMsg = (messages as any[])[(messages as any[]).length - 1];
+
+                if (userCount < 2) return null;
+                if (lastMsg?.role !== "assistant") return null;
+
+                const maxBursts = 4;
+
+                const lastAssistant = [...(messages as any[])].reverse().find((m: any) => m?.role === "assistant");
+                const assistantKey =
+                  String(lastAssistant?.id || "").trim() ||
+                  String(lastAssistant?.created_at || "").trim() ||
+                  String(lastAssistant?.content || "").slice(0, 80);
+
+                const isNewBurst = assistantKey && pillsLastAssistantKeyRef.current !== assistantKey;
+
+                if (isNewBurst) {
+                  if (pillsBurstCountRef.current >= maxBursts) return null;
+                  pillsLastAssistantKeyRef.current = assistantKey;
+                  pillsBurstCountRef.current += 1;
+                } else {
+                  if (pillsBurstCountRef.current >= maxBursts) return null;
+                }
+/* PILLS_GATE_MAX_END */
+
                     const lastA = [...messages].reverse().find((m: any) => m?.role === "assistant");
                     const list = buildVisionPills(lastA?.content || "");
                     return Array.isArray(list) && list.length ? (
